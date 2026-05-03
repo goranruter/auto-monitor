@@ -134,8 +134,125 @@ async function fetchPage(url) {
   const page = await browserContext.newPage();
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForTimeout(1500); // let JS render
+    await page.waitForTimeout(2000);
     return await page.content();
+  } finally {
+    await page.close();
+  }
+}
+
+async function fetchListingsFromPage(url, search) {
+  const page = await browserContext.newPage();
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForTimeout(2000);
+
+    const results = await page.evaluate((params) => {
+      const { brand, model, label, MIN_PRICE, MAX_PRICE, MIN_YEAR } = params;
+      const listings = [];
+
+      // Find all links pointing to individual ad pages
+      const adLinks = Array.from(document.querySelectorAll('a[href*="/auto-oglasi/"]'))
+        .filter(a => /\/auto-oglasi\/[^/]+\/[^/]+/.test(a.href) && !a.href.includes('pretraga') && !a.href.includes('poslednja'));
+
+      // Get unique article containers
+      const seen = new Set();
+      for (const link of adLinks) {
+        // Walk up to find the listing container
+        let el = link;
+        for (let i = 0; i < 6; i++) {
+          el = el.parentElement;
+          if (!el) break;
+          const tag = el.tagName?.toLowerCase();
+          if (tag === 'article' || tag === 'li' || (tag === 'div' && el.className && el.className.length > 5)) {
+            break;
+          }
+        }
+        if (!el || seen.has(el)) continue;
+        seen.add(el);
+
+        const text = el.innerText || '';
+        const html = el.innerHTML || '';
+
+        // Title: from heading or link text
+        const heading = el.querySelector('h2, h3, h4, [class*="title"], [class*="naziv"]');
+        const title = heading?.innerText?.trim() || link.innerText?.trim() || '';
+        if (!title || title.length < 3) continue;
+
+        // Link
+        const href = link.href || '';
+
+        // Image
+        const img = el.querySelector('img');
+        const image = img?.src || img?.dataset?.src || img?.getAttribute('data-lazy-src') || null;
+
+        // Price: find € in text
+        const priceMatch = text.match(/([\d\.\s]+)\s*€/);
+        const price = priceMatch ? parseInt(priceMatch[1].replace(/[^\d]/g, '')) : null;
+        if (!price || price < MIN_PRICE || price > MAX_PRICE) continue;
+
+        // Year
+        const yearMatch = text.match(/\b(201[5-9]|202[0-9])\b/);
+        const year = yearMatch ? parseInt(yearMatch[0]) : null;
+        if (year && year < MIN_YEAR) continue;
+
+        // KM — match 3-6 digit number before "km", avoid millions
+        const kmMatch = text.match(/\b(\d{2,3}(?:[.\s]\d{3})?)\s*km\b/i);
+        const km = kmMatch ? parseInt(kmMatch[1].replace(/[^\d]/g, '')) : null;
+
+        // Engine
+        const engineMatch = text.match(/\b\d[.,]\d\s*[a-zA-Z]{2,4}\b/);
+        const engine = engineMatch ? engineMatch[0] : '';
+
+        // Location
+        const locEl = el.querySelector('[class*="location"], [class*="lokacija"], [class*="city"], [class*="grad"]');
+        const location = locEl?.innerText?.trim() || '';
+
+        // Fuel
+        const t = text.toLowerCase();
+        let fuel = null;
+        if (/elektr|ev\b/.test(t)) fuel = 'electric';
+        else if (/hibrid|hybrid/.test(t)) fuel = 'hybrid';
+        else if (/tdi|cdi|hdi|dci|dizel|diesel/.test(t)) fuel = 'diesel';
+        else if (/tsi|tfsi|benzin|petrol|mpi/.test(t)) fuel = 'petrol';
+
+        // Transmission
+        let transmission = null;
+        if (/dsg|automat|tiptronic|cvt|automatski/.test(t)) transmission = 'automatic';
+        else if (/manuelni|manuelna|manual/.test(t)) transmission = 'manual';
+
+        // Registration months
+        let regMonths = 0;
+        const regMatch = text.match(/registr[a-z]*[:\s]+(\d{2})\.(\d{4})/i);
+        if (regMatch) {
+          const now = new Date();
+          regMonths = Math.max(0, (parseInt(regMatch[2]) - now.getFullYear()) * 12 + (parseInt(regMatch[1]) - now.getMonth() - 1));
+        }
+
+        // Registration cost in RSD
+        let annualRegCostEur = null;
+        const rsdMatch = text.match(/od\s+([\d\.,]+)\s*rsd\s+do\s+([\d\.,]+)\s*rsd/i);
+        if (rsdMatch) {
+          const min = parseInt(rsdMatch[1].replace(/[^\d]/g, ''));
+          const max = parseInt(rsdMatch[2].replace(/[^\d]/g, ''));
+          annualRegCostEur = Math.round((min + max) / 2 / 117);
+        }
+
+        const monthlyRate = annualRegCostEur ? annualRegCostEur / 12 : 40;
+        const regBonus = Math.round(regMonths * monthlyRate);
+
+        const id = `${brand}-${model}-${price}-${km || 0}-${year || 0}`;
+        listings.push({ id, title, price, year, km, engine, location, link: href, image, fuel, transmission, regMonths, annualRegCostEur, regBonus, searchLabel: label });
+      }
+
+      return listings;
+    }, { brand: search.brand, model: search.model, label: search.label, MIN_PRICE, MAX_PRICE, MIN_YEAR });
+
+    console.log(`  [${url.includes('poslednja24h') ? '24h' : 'baseline'}] Found ${results.length} listings`);
+    return results;
+  } catch (err) {
+    console.error(`  Fetch error for ${url}: ${err.message}`);
+    return [];
   } finally {
     await page.close();
   }
@@ -253,27 +370,15 @@ async function fetchListings(search, last24h = false) {
   const url = last24h
     ? `https://www.polovniautomobili.com/auto-oglasi/poslednja24h?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&price_to=${MAX_PRICE}&year_from=${MIN_YEAR}&year_to=&modeltxt=&showOldNew=all&country=&city=&submit_1=&page=&sort=`
     : `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&price_to=${MAX_PRICE}&year_from=${MIN_YEAR}&sort=date_desc&showOldNew=all&page=1`;
-
-  try {
-    const html = await fetchPage(url);
-    return parseListings(html, search);
-  } catch (err) {
-    console.error(`  Fetch error: ${err.message}`);
-    return [];
-  }
+  return fetchListingsFromPage(url, search);
 }
 
 async function fetchBaseline(search) {
   const results = [];
-  for (const page of [1, 2]) {
-    const url = `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&price_to=${MAX_PRICE}&year_from=${MIN_YEAR}&sort=date_desc&showOldNew=all&page=${page}`;
-    try {
-      const html = await fetchPage(url);
-      const listings = parseListings(html, search);
-      results.push(...listings);
-    } catch (err) {
-      console.error(`  Baseline page ${page} error: ${err.message}`);
-    }
+  for (const p of [1, 2]) {
+    const url = `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&price_to=${MAX_PRICE}&year_from=${MIN_YEAR}&sort=date_desc&showOldNew=all&page=${p}`;
+    const listings = await fetchListingsFromPage(url, search);
+    results.push(...listings);
     await new Promise((r) => setTimeout(r, 1000));
   }
   return results;

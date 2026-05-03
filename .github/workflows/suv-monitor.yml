@@ -1,7 +1,7 @@
 name: suv-monitor
 on:
   schedule:
-    - cron: '0 * * * *' # every hour at :00
+    - cron: '0 5-20 * * *' # every hour at :00, 07:00–22:00 Belgrade (UTC+2)
   workflow_dispatch:
 
 jobs:

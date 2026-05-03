@@ -1,4 +1,4 @@
-const axios = require('axios');
+const { chromium } = require('playwright');
 const cheerio = require('cheerio');
 const nodemailer = require('nodemailer');
 const fs = require('fs');
@@ -34,38 +34,22 @@ const SEARCHES = [
   { brand: 'renault', model: 'megane', label: 'Renault Megane' },
 ];
 
-const BASE_URL = 'https://www.polovniautomobili.com';
+let browser = null;
+let browserContext = null;
 
-const HTTP_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-  'Accept-Language': 'sr-RS,sr;q=0.9,en-US;q=0.8,en;q=0.7',
-  'Accept-Encoding': 'gzip, deflate, br',
-  'Connection': 'keep-alive',
-  'Upgrade-Insecure-Requests': '1',
-  'Sec-Fetch-Dest': 'document',
-  'Sec-Fetch-Mode': 'navigate',
-  'Sec-Fetch-Site': 'same-origin',
-  'Cache-Control': 'max-age=0',
-};
-
-let sessionCookies = '';
-
-async function initSession() {
-  try {
-    const res = await axios.get(BASE_URL, {
-      headers: HTTP_HEADERS,
-      timeout: 15000,
-      maxRedirects: 5,
-    });
-    const setCookie = res.headers['set-cookie'];
-    if (setCookie) {
-      sessionCookies = setCookie.map((c) => c.split(';')[0]).join('; ');
-      console.log(`Session initialized, cookies: ${sessionCookies.slice(0, 80)}...`);
-    }
-  } catch (err) {
-    console.error(`Session init error: ${err.message}`);
-  }
+async function initBrowser() {
+  browser = await chromium.launch({ headless: true });
+  browserContext = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    locale: 'sr-RS',
+    timezoneId: 'Europe/Belgrade',
+    viewport: { width: 1280, height: 800 },
+  });
+  // Warm up session by visiting homepage first
+  const page = await browserContext.newPage();
+  await page.goto('https://www.polovniautomobili.com', { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.close();
+  console.log('Browser session initialized.');
 }
 
 function loadSeen() {
@@ -99,19 +83,14 @@ function parseYear(str) {
 }
 
 async function fetchPage(url) {
-  const headers = {
-    ...HTTP_HEADERS,
-    'Referer': BASE_URL + '/',
-    ...(sessionCookies ? { 'Cookie': sessionCookies } : {}),
-  };
-  const res = await axios.get(url, { headers, timeout: 30000, maxRedirects: 5 });
-  // Capture any new cookies
-  const setCookie = res.headers['set-cookie'];
-  if (setCookie) {
-    const newCookies = setCookie.map((c) => c.split(';')[0]).join('; ');
-    sessionCookies = sessionCookies ? `${sessionCookies}; ${newCookies}` : newCookies;
+  const page = await browserContext.newPage();
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForTimeout(1500); // let JS render
+    return await page.content();
+  } finally {
+    await page.close();
   }
-  return res.data;
 }
 
 function parseListings(html, search) {
@@ -365,7 +344,7 @@ async function main() {
   console.log(`\n=== Auto Monitor Start: ${new Date().toISOString()} ===`);
   console.log(`Min price: ${MIN_PRICE}€ | Min deal score: ${MIN_DEAL_SCORE} | Searches: ${SEARCHES.length}`);
 
-  await initSession();
+  await initBrowser();
 
   const seen = loadSeen();
   const newDeals = [];
@@ -413,10 +392,12 @@ async function main() {
   } else {
     console.log('Nema novih top ponuda, email se ne šalje.');
   }
+  if (browser) await browser.close();
   console.log('=== Done ===\n');
 }
 
-main().catch((err) => {
+main().catch(async (err) => {
+  if (browser) await browser.close();
   console.error('Fatal error:', err);
   process.exit(1);
 });

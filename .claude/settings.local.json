@@ -3,7 +3,16 @@
     "allow": [
       "Bash(git remote *)",
       "Bash(ssh-add -l)",
-      "Bash(ssh-add --apple-use-keychain ~/.ssh/id_ed25519_github_personal)"
+      "Bash(ssh-add --apple-use-keychain ~/.ssh/id_ed25519_github_personal)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(npm show *)",
+      "Bash(node -e \"const nm = require\\('nodemailer'\\); console.log\\('createTransport:', typeof nm.createTransport\\)\")",
+      "Bash(git rm *)",
+      "Bash(git reset *)",
+      "Bash(git stash *)",
+      "Bash(git pull *)"
     ]
   }
 }

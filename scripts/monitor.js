@@ -7,7 +7,7 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GMAIL_USER = process.env.GMAIL_USER;
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'goranruter1@gmail.com';
-const MIN_DEAL_SCORE = parseInt(process.env.MIN_DEAL_SCORE || '80');
+const MIN_DEAL_SCORE = parseInt(process.env.MIN_DEAL_SCORE || '70');
 const MIN_PRICE = parseInt(process.env.MIN_PRICE || '10000');
 
 // File to track already-seen listings (persists via git commit or cache)

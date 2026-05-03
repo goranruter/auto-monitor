@@ -581,40 +581,54 @@ async function main() {
   const seen = loadSeen();
   const newDeals = [];
 
+  // Phase 1: collect baseline listings from ALL models for a broad market pool
+  console.log('\n--- Phase 1: Fetching baseline listings for all models ---');
+  const globalBaseline = [];
   for (const search of SEARCHES) {
-    console.log(`\nFetching: ${search.label}`);
+    const listings = await fetchBaseline(search);
+    globalBaseline.push(...listings);
+    console.log(`  ${search.label}: ${listings.length} baseline listings`);
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  console.log(`Global baseline pool: ${globalBaseline.length} listings across all models`);
 
-    const [newListings, baselineListings] = await Promise.all([
-      fetchListings(search, true),
-      fetchBaseline(search),
-    ]);
+  // Phase 2: check new (24h) listings for each model, score against full global pool
+  console.log('\n--- Phase 2: Checking new listings ---');
+  for (const search of SEARCHES) {
+    console.log(`\nFetching 24h: ${search.label}`);
 
-    const allListings = [...newListings, ...baselineListings];
-    console.log(`  Novi (24h): ${newListings.length} | Baseline: ${baselineListings.length}`);
+    const newListings = await fetchListings(search, true);
+    console.log(`  Novi (24h): ${newListings.length}`);
 
-    if (allListings.length === 0) continue;
+    if (newListings.length === 0) {
+      await new Promise((r) => setTimeout(r, 1000));
+      continue;
+    }
+
+    // Score against all listings: new ones + entire global baseline
+    const scoringPool = [...newListings, ...globalBaseline];
 
     // Show listing if unseen OR if price changed since last time
     const toScore = newListings.filter((l) => {
       const prev = seen[l.id];
       if (!prev) return true;
-      return prev.price !== l.price; // price changed — re-evaluate
+      return prev.price !== l.price;
     });
     console.log(`  Za analizu: ${toScore.length}`);
 
     for (const listing of toScore) {
-      const scored = scoreListing(listing, allListings);
+      const scored = scoreListing(listing, scoringPool);
       console.log(`    ${listing.title}: score=${scored.dealScore}, cena=${listing.price}€, median=${scored.marketAvg}€`);
       if (scored.dealScore >= MIN_DEAL_SCORE) {
         newDeals.push({ ...listing, ...scored });
       }
     }
 
-    for (const l of allListings) {
+    for (const l of newListings) {
       seen[l.id] = { date: new Date().toISOString(), price: l.price };
     }
 
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 1000));
   }
 
   const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();

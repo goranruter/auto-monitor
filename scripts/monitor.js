@@ -84,6 +84,36 @@ function parseYear(str) {
   return match ? parseInt(match[0]) : null;
 }
 
+function detectFuel(text) {
+  const t = text.toLowerCase();
+  if (/elektr|ev\b|bev/.test(t)) return 'electric';
+  if (/hibrid|hybrid|phev|hev/.test(t)) return 'hybrid';
+  if (/tdi|cdi|hdi|dci|crdi|jtd|dizel|diesel|bluemotion|cdti/.test(t)) return 'diesel';
+  if (/tsi|tfsi|fsi|gti|gsi|benzin|petrol|mpi|turbo benzin/.test(t)) return 'petrol';
+  return null;
+}
+
+function detectTransmission(text) {
+  const t = text.toLowerCase();
+  if (/dsg|automat|automatik|tiptronic|cvt|s.tronic|pdk|xtronic|automatski/.test(t)) return 'automatic';
+  if (/manuelni|manuelna|manuelni|6-brzin|5-brzin|manual/.test(t)) return 'manual';
+  return null;
+}
+
+// Returns months of registration remaining from text like "Registracija: 05.2027"
+function parseRegistrationMonths(text) {
+  const match = text.match(/registr[a-z]*[:\s]+(\d{2})\.(\d{4})/i);
+  if (!match) return 0;
+  const regMonth = parseInt(match[1]);
+  const regYear = parseInt(match[2]);
+  const now = new Date();
+  const months = (regYear - now.getFullYear()) * 12 + (regMonth - now.getMonth() - 1);
+  return Math.max(0, months);
+}
+
+// ~80€/month is rough registration cost in Serbia
+const REG_VALUE_PER_MONTH = 80;
+
 async function fetchPage(url) {
   const page = await browserContext.newPage();
   try {
@@ -189,9 +219,14 @@ function parseListings(html, search) {
     if (year && year < MIN_YEAR) return;
 
     const image = $el.find('img').first().attr('src') || $el.find('img').first().attr('data-src') || null;
+    const fullText = `${title} ${engine} ${detailText} ${allText}`;
+    const fuel = detectFuel(fullText);
+    const transmission = detectTransmission(fullText);
+    const regMonths = parseRegistrationMonths(fullText);
+    const regBonus = regMonths * REG_VALUE_PER_MONTH;
 
     const id = `${search.brand}-${search.model}-${price}-${km || 0}-${year || 0}`;
-    listings.push({ id, title, price, year, km, engine, location, link: fullLink, image, searchLabel: search.label });
+    listings.push({ id, title, price, year, km, engine, location, link: fullLink, image, fuel, transmission, regMonths, regBonus, searchLabel: search.label });
   });
 
   return listings;
@@ -237,23 +272,38 @@ function calcMedian(prices) {
 function scoreListing(listing, allListings) {
   const year = listing.year || 0;
   const km = listing.km || 0;
+  const fuel = listing.fuel;
+  const transmission = listing.transmission;
   const others = allListings.filter((l) => l.id !== listing.id && l.price >= MIN_PRICE);
 
-  // 1. Best: same year ±2 + similar km ±40%
-  let pool = others.filter((l) => {
-    const yearOk = !year || !l.year || Math.abs(l.year - year) <= 2;
-    const kmOk = !km || !l.km || (l.km >= km * 0.6 && l.km <= km * 1.4);
-    return yearOk && kmOk;
-  });
-  let poolDesc = `${pool.length} oglasa (±2 god, slična km)`;
+  const yearOk = (l) => !year || !l.year || Math.abs(l.year - year) <= 2;
+  const kmOk = (l) => !km || !l.km || (l.km >= km * 0.6 && l.km <= km * 1.4);
+  const fuelOk = (l) => !fuel || !l.fuel || l.fuel === fuel;
+  const transOk = (l) => !transmission || !l.transmission || l.transmission === transmission;
 
-  // 2. Fallback: year ±3
+  // 1. Best: year ±2, km ±40%, same fuel, same transmission
+  let pool = others.filter((l) => yearOk(l) && kmOk(l) && fuelOk(l) && transOk(l));
+  let poolDesc = `${pool.length} oglasa (god, km, gorivo, menjač)`;
+
+  // 2. Drop transmission filter
   if (pool.length < 4) {
-    pool = others.filter((l) => !year || !l.year || Math.abs(l.year - year) <= 3);
-    poolDesc = `${pool.length} oglasa (±3 god)`;
+    pool = others.filter((l) => yearOk(l) && kmOk(l) && fuelOk(l));
+    poolDesc = `${pool.length} oglasa (god, km, gorivo)`;
   }
 
-  // 3. Fallback: all
+  // 3. Drop fuel filter
+  if (pool.length < 4) {
+    pool = others.filter((l) => yearOk(l) && kmOk(l));
+    poolDesc = `${pool.length} oglasa (god ±2, slična km)`;
+  }
+
+  // 4. Widen year
+  if (pool.length < 4) {
+    pool = others.filter((l) => !year || !l.year || Math.abs(l.year - year) <= 3);
+    poolDesc = `${pool.length} oglasa (god ±3)`;
+  }
+
+  // 5. All
   if (pool.length < 3) {
     pool = others;
     poolDesc = `${pool.length} oglasa modela`;
@@ -264,19 +314,27 @@ function scoreListing(listing, allListings) {
   }
 
   const median = calcMedian(pool.map((l) => l.price));
-  const savings = median - listing.price;
+
+  // Effective price adjusts for included registration value
+  const regBonus = listing.regBonus || 0;
+  const effectivePrice = listing.price - regBonus;
+  const savings = median - effectivePrice;
   const deviationPct = savings / median;
 
-  // 50 = at median, +25 per 10% below median
   const dealScore = Math.min(100, Math.max(0, Math.round(50 + deviationPct * 250)));
 
   const direction = savings > 0 ? 'ispod' : 'iznad';
-  const reason =
-    `Cena ${listing.price.toLocaleString('de-DE')}€ je ${Math.abs(Math.round(deviationPct * 100))}% ` +
-    `${direction} medijana (${median.toLocaleString('de-DE')}€) ` +
-    `na osnovu ${poolDesc} sa sličnim godištem${km ? ' i kilometražom' : ''}.`;
+  const fuelLabel = { diesel: 'dizel', petrol: 'benzin', hybrid: 'hibrid', electric: 'struja' }[fuel] || '';
+  const transLabel = { automatic: 'automatik', manual: 'manuelni' }[transmission] || '';
+  const extras = [fuelLabel, transLabel].filter(Boolean).join(', ');
+  const regNote = regBonus > 0 ? ` + ${listing.regMonths} mes. registracije (≈${regBonus}€)` : '';
 
-  return { dealScore, marketAvg: median, savings, reason };
+  const reason =
+    `Efektivna cena ${effectivePrice.toLocaleString('de-DE')}€${regNote} je ${Math.abs(Math.round(deviationPct * 100))}% ` +
+    `${direction} medijana (${median.toLocaleString('de-DE')}€) ` +
+    `na osnovu ${poolDesc}${extras ? ` [${extras}]` : ''}.`;
+
+  return { dealScore, marketAvg: median, savings: Math.round(savings), reason };
 }
 
 function buildEmailHtml(deals) {
@@ -290,7 +348,12 @@ function buildEmailHtml(deals) {
       </td>
       <td style="padding: 12px 8px;">
         <strong>${d.title}</strong><br>
-        <span style="font-size: 12px; color: #666;">${d.searchLabel} · ${d.year || '?'} · ${d.km ? d.km.toLocaleString('de-DE') + ' km' : '?'} · ${d.engine || '?'}</span>
+        <span style="font-size: 12px; color: #666;">
+          ${d.searchLabel} · ${d.year || '?'} · ${d.km ? d.km.toLocaleString('de-DE') + ' km' : '?'} · ${d.engine || '?'}
+          ${d.fuel ? `· <strong>${{diesel:'⛽ Dizel',petrol:'⛽ Benzin',hybrid:'🔋 Hibrid',electric:'⚡ Struja'}[d.fuel]}</strong>` : ''}
+          ${d.transmission ? `· ${{automatic:'🔄 Automat',manual:'⚙️ Manuelni'}[d.transmission]}` : ''}
+          ${d.regMonths > 0 ? `· 📋 Reg. još ${d.regMonths} mes.` : ''}
+        </span>
       </td>
       <td style="padding: 12px 8px; text-align: center;">
         <span style="background:${d.dealScore >= 80 ? '#00c853' : '#ff9100'};color:white;padding:4px 10px;border-radius:20px;font-weight:bold;">${d.dealScore}/100</span>

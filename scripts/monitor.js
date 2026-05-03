@@ -200,33 +200,42 @@ async function fetchListingsFromPage(url, search) {
         const kmMatch = text.match(/\b(\d{2,3}(?:[.\s]\d{3})?)\s*km\b/i);
         const km = kmMatch ? parseInt(kmMatch[1].replace(/[^\d]/g, '')) : null;
 
-        // Engine
-        const engineMatch = text.match(/\b\d[.,]\d\s*[a-zA-Z]{2,4}\b/);
+        // Engine displacement and label
+        const engineMatch = text.match(/\b(\d)[.,](\d)\s*([a-zA-Z]{2,5})\b/);
         const engine = engineMatch ? engineMatch[0] : '';
-
-        // Location
-        const locEl = el.querySelector('[class*="location"], [class*="lokacija"], [class*="city"], [class*="grad"]');
-        const location = locEl?.innerText?.trim() || '';
+        const engineCC = engineMatch ? parseInt(engineMatch[1]) * 1000 + parseInt(engineMatch[2]) * 100 : null;
 
         // Fuel
         const t = text.toLowerCase();
         let fuel = null;
         if (/elektr|ev\b/.test(t)) fuel = 'electric';
-        else if (/hibrid|hybrid/.test(t)) fuel = 'hybrid';
-        else if (/tdi|cdi|hdi|dci|dizel|diesel/.test(t)) fuel = 'diesel';
-        else if (/tsi|tfsi|benzin|petrol|mpi/.test(t)) fuel = 'petrol';
+        else if (/hibrid|hybrid|phev|hev/.test(t)) fuel = 'hybrid';
+        else if (/tdi|cdi|hdi|dci|dizel|diesel|cdti/.test(t)) fuel = 'diesel';
+        else if (/tsi|tfsi|fsi|benzin|petrol|mpi/.test(t)) fuel = 'petrol';
+
+        // Filter: max 2000cc except hybrids/electrics
+        if (engineCC && engineCC > 2000 && fuel !== 'hybrid' && fuel !== 'electric') continue;
+
+        // Location
+        const locEl = el.querySelector('[class*="location"], [class*="lokacija"], [class*="city"], [class*="grad"]');
+        const location = locEl?.innerText?.trim() || '';
 
         // Transmission
         let transmission = null;
         if (/dsg|automat|tiptronic|cvt|automatski/.test(t)) transmission = 'automatic';
         else if (/manuelni|manuelna|manual/.test(t)) transmission = 'manual';
 
-        // Registration months
+        // "Nije registrovano" check
+        const notRegistered = /nije\s+registr|neregistr/i.test(text);
+
+        // Registration months (from date like "Registracija: 05.2027")
         let regMonths = 0;
-        const regMatch = text.match(/registr[a-z]*[:\s]+(\d{2})\.(\d{4})/i);
-        if (regMatch) {
-          const now = new Date();
-          regMonths = Math.max(0, (parseInt(regMatch[2]) - now.getFullYear()) * 12 + (parseInt(regMatch[1]) - now.getMonth() - 1));
+        if (!notRegistered) {
+          const regMatch = text.match(/registr[a-z]*[:\s]+(\d{2})\.(\d{4})/i);
+          if (regMatch) {
+            const now = new Date();
+            regMonths = Math.max(0, (parseInt(regMatch[2]) - now.getFullYear()) * 12 + (parseInt(regMatch[1]) - now.getMonth() - 1));
+          }
         }
 
         // Registration cost in RSD
@@ -239,10 +248,15 @@ async function fetchListingsFromPage(url, search) {
         }
 
         const monthlyRate = annualRegCostEur ? annualRegCostEur / 12 : 40;
-        const regBonus = Math.round(regMonths * monthlyRate);
+
+        // regBonus: positive = registration included (saves money)
+        //           negative = not registered (buyer must pay ~12 months)
+        const regBonus = notRegistered
+          ? -Math.round(12 * monthlyRate)
+          : Math.round(regMonths * monthlyRate);
 
         const id = `${brand}-${model}-${price}-${km || 0}-${year || 0}`;
-        listings.push({ id, title, price, year, km, engine, location, link: href, image, fuel, transmission, regMonths, annualRegCostEur, regBonus, searchLabel: label });
+        listings.push({ id, title, price, year, km, engine, engineCC, location, link: href, image, fuel, transmission, regMonths, notRegistered, annualRegCostEur, regBonus, searchLabel: label });
       }
 
       return listings;
@@ -450,7 +464,9 @@ function scoreListing(listing, allListings) {
   const transLabel = { automatic: 'automatik', manual: 'manuelni' }[transmission] || '';
   const extras = [fuelLabel, transLabel].filter(Boolean).join(', ');
   const regCostNote = listing.annualRegCostEur ? `≈${listing.annualRegCostEur}€/god` : `≈${REG_VALUE_PER_MONTH_FALLBACK}€/mes`;
-  const regNote = regBonus > 0 ? ` + ${listing.regMonths} mes. reg. (${regCostNote}, bonus ≈${regBonus}€)` : '';
+  const regNote = listing.notRegistered
+    ? ` ⚠️ nije registrovano (trošak ≈${Math.abs(regBonus)}€)`
+    : regBonus > 0 ? ` + ${listing.regMonths} mes. reg. (${regCostNote}, bonus ≈${regBonus}€)` : '';
 
   const reason =
     `Efektivna cena ${effectivePrice.toLocaleString('de-DE')}€${regNote} je ${Math.abs(Math.round(deviationPct * 100))}% ` +
@@ -475,7 +491,7 @@ function buildEmailHtml(deals) {
           ${d.searchLabel} · ${d.year || '?'} · ${d.km ? d.km.toLocaleString('de-DE') + ' km' : '?'} · ${d.engine || '?'}
           ${d.fuel ? `· <strong>${{diesel:'⛽ Dizel',petrol:'⛽ Benzin',hybrid:'🔋 Hibrid',electric:'⚡ Struja'}[d.fuel]}</strong>` : ''}
           ${d.transmission ? `· ${{automatic:'🔄 Automat',manual:'⚙️ Manuelni'}[d.transmission]}` : ''}
-          ${d.regMonths > 0 ? `· 📋 Reg. još ${d.regMonths} mes.` : ''}
+          ${d.notRegistered ? `· <span style="color:red;">⚠️ Nije registrovano</span>` : d.regMonths > 0 ? `· 📋 Reg. još ${d.regMonths} mes.` : ''}
         </span>
       </td>
       <td style="padding: 12px 8px; text-align: center;">

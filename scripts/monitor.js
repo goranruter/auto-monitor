@@ -16,45 +16,16 @@ const MIN_YEAR = parseInt(process.env.MIN_YEAR || '2014');
 const SEEN_FILE = path.join(__dirname, '../seen_listings.json');
 
 const SEARCHES = [
-  // VW Group
-  { brand: 'volkswagen', model: 'golf', label: 'VW Golf' },
-  { brand: 'volkswagen', model: 'passat', label: 'VW Passat' },
-  { brand: 'volkswagen', model: 'tiguan', label: 'VW Tiguan' },
-  { brand: 'volkswagen', model: 'touran', label: 'VW Touran' },
-  { brand: 'skoda', model: 'octavia', label: 'Skoda Octavia' },
-  { brand: 'skoda', model: 'superb', label: 'Skoda Superb' },
-  { brand: 'seat', model: 'leon', label: 'Seat Leon' },
-  // BMW
-  { brand: 'bmw', model: 'serija-3', label: 'BMW Serija 3' },
-  { brand: 'bmw', model: 'serija-5', label: 'BMW Serija 5' },
-  { brand: 'bmw', model: 'x1', label: 'BMW X1' },
-  // Audi
-  { brand: 'audi', model: 'a4', label: 'Audi A4' },
-  { brand: 'audi', model: 'a6', label: 'Audi A6' },
-  { brand: 'audi', model: 'q3', label: 'Audi Q3' },
-  // Mercedes
+  { brand: 'volkswagen', model: 'golf',     label: 'VW Golf' },
+  { brand: 'volkswagen', model: 'passat',   label: 'VW Passat' },
+  { brand: 'skoda',      model: 'octavia',  label: 'Skoda Octavia' },
+  { brand: 'audi',       model: 'a4',       label: 'Audi A4' },
+  { brand: 'bmw',        model: 'serija-3', label: 'BMW Serija 3' },
   { brand: 'mercedes-benz', model: 'c-klasa', label: 'Mercedes C' },
-  { brand: 'mercedes-benz', model: 'e-klasa', label: 'Mercedes E' },
-  // Ford
-  { brand: 'ford', model: 'focus', label: 'Ford Focus' },
-  { brand: 'ford', model: 'mondeo', label: 'Ford Mondeo' },
-  // Opel
-  { brand: 'opel', model: 'astra', label: 'Opel Astra' },
-  { brand: 'opel', model: 'insignia', label: 'Opel Insignia' },
-  // Hyundai / Kia
-  { brand: 'hyundai', model: 'tucson', label: 'Hyundai Tucson' },
-  { brand: 'hyundai', model: 'ix35', label: 'Hyundai ix35' },
-  { brand: 'kia', model: 'sportage', label: 'Kia Sportage' },
-  { brand: 'kia', model: 'ceed', label: 'Kia Ceed' },
-  // Toyota / Mazda
-  { brand: 'toyota', model: 'rav4', label: 'Toyota RAV4' },
-  { brand: 'toyota', model: 'auris', label: 'Toyota Auris' },
-  { brand: 'mazda', model: 'cx-5', label: 'Mazda CX-5' },
-  // Nissan / Renault / Peugeot
-  { brand: 'nissan', model: 'qashqai', label: 'Nissan Qashqai' },
-  { brand: 'renault', model: 'megane', label: 'Renault Megane' },
-  { brand: 'peugeot', model: '308', label: 'Peugeot 308' },
-  { brand: 'peugeot', model: '3008', label: 'Peugeot 3008' },
+  { brand: 'opel',       model: 'astra',    label: 'Opel Astra' },
+  { brand: 'ford',       model: 'focus',    label: 'Ford Focus' },
+  { brand: 'renault',    model: 'megane',   label: 'Renault Megane' },
+  { brand: 'nissan',     model: 'qashqai',  label: 'Nissan Qashqai' },
 ];
 
 let browser = null;
@@ -601,7 +572,7 @@ async function main() {
     const listings = await fetchBaseline(search);
     console.log(`  ${search.label}: ${listings.length} baseline listings`);
     return listings;
-  }, 5);
+  }, 2);
   const globalBaseline = baselineResults.flat();
   console.log(`Global baseline pool: ${globalBaseline.length} listings across all models`);
 
@@ -621,7 +592,7 @@ async function main() {
     const newListings = Array.from(dedupMap.values());
     console.log(`  ${search.label}: ${newListings.length} novi (raw: ${rawListings.length})`);
     return newListings;
-  }, 5);
+  }, 2);
 
   for (const newListings of phase2Results) {
     if (newListings.length === 0) continue;

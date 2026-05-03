@@ -1,4 +1,5 @@
 const axios = require('axios');
+const cheerio = require('cheerio');
 const nodemailer = require('nodemailer');
 const fs = require('fs');
 const path = require('path');
@@ -33,6 +34,13 @@ const SEARCHES = [
   { brand: 'renault', model: 'megane', label: 'Renault Megane' },
 ];
 
+const HTTP_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'sr-RS,sr;q=0.9,en;q=0.8',
+  'Accept-Encoding': 'gzip, deflate, br',
+};
+
 function loadSeen() {
   try {
     return JSON.parse(fs.readFileSync(SEEN_FILE, 'utf8'));
@@ -45,89 +53,156 @@ function saveSeen(seen) {
   fs.writeFileSync(SEEN_FILE, JSON.stringify(seen, null, 2));
 }
 
-function extractJsonArray(text) {
-  // Strip markdown code blocks
-  const cleaned = text.replace(/```json\n?|```\n?/g, '').trim();
-
-  // Walk the string tracking bracket depth to find the outermost complete array
-  let depth = 0;
-  let start = -1;
-  for (let i = 0; i < cleaned.length; i++) {
-    if (cleaned[i] === '[') {
-      if (depth === 0) start = i;
-      depth++;
-    } else if (cleaned[i] === ']') {
-      depth--;
-      if (depth === 0 && start !== -1) {
-        try {
-          return JSON.parse(cleaned.slice(start, i + 1));
-        } catch {
-          start = -1; // malformed, keep scanning
-        }
-      }
-    }
-  }
-  return null;
+function parsePrice(str) {
+  if (!str) return null;
+  const num = parseInt(str.replace(/[^\d]/g, ''));
+  return isNaN(num) ? null : num;
 }
 
-async function fetchListingsPage(search, page, last24h = false) {
+function parseKm(str) {
+  if (!str) return null;
+  const num = parseInt(str.replace(/[^\d]/g, ''));
+  return isNaN(num) ? null : num;
+}
+
+function parseYear(str) {
+  if (!str) return null;
+  const match = str.match(/\b(19|20)\d{2}\b/);
+  return match ? parseInt(match[0]) : null;
+}
+
+async function fetchPage(url) {
+  const res = await axios.get(url, { headers: HTTP_HEADERS, timeout: 30000 });
+  return res.data;
+}
+
+function parseListings(html, search) {
+  const $ = cheerio.load(html);
+  const listings = [];
+
+  // Log a snippet of the HTML on first parse attempt to help debug selectors
+  const bodySnippet = $('body').html()?.slice(0, 500) || '';
+  console.log(`  HTML snippet: ${bodySnippet.replace(/\s+/g, ' ').slice(0, 300)}`);
+
+  // Try multiple selector strategies
+  const candidateSelectors = [
+    'article.classified-item',
+    'article[class*="classified"]',
+    'article[class*="oglas"]',
+    '.classified-item',
+    '.oglas',
+    'article',
+    '[data-classifiedid]',
+    '[data-ad-id]',
+    '.js-adClick',
+  ];
+
+  let items = null;
+  let usedSelector = '';
+
+  for (const sel of candidateSelectors) {
+    const found = $(sel);
+    if (found.length > 0) {
+      items = found;
+      usedSelector = sel;
+      break;
+    }
+  }
+
+  if (!items || items.length === 0) {
+    console.log(`  No listing elements found. Trying JSON-LD...`);
+
+    // Try JSON-LD structured data
+    $('script[type="application/ld+json"]').each((_, el) => {
+      try {
+        const data = JSON.parse($(el).html());
+        const arr = Array.isArray(data) ? data : [data];
+        for (const item of arr) {
+          if (item['@type'] === 'Car' || item['@type'] === 'Product') {
+            const price = item.offers?.price || item.price;
+            listings.push({
+              id: `${search.brand}-${search.model}-${price}-ld`,
+              title: item.name || '',
+              price: parsePrice(String(price)),
+              year: parseYear(item.vehicleModelDate || item.productionDate || ''),
+              km: parseKm(item.mileageFromOdometer?.value || ''),
+              engine: item.vehicleEngine?.engineDisplacement || '',
+              location: item.availableAtOrFrom?.name || '',
+              link: item.url || '',
+              searchLabel: search.label,
+            });
+          }
+        }
+      } catch {}
+    });
+
+    return listings;
+  }
+
+  console.log(`  Found ${items.length} items with selector: "${usedSelector}"`);
+
+  items.each((i, el) => {
+    const $el = $(el);
+
+    const link = $el.find('a').first().attr('href') || $el.attr('href') || '';
+    const fullLink = link.startsWith('http') ? link : `https://www.polovniautomobili.com${link}`;
+
+    const title = $el.find('h2, h3, .title, [class*="title"], [class*="naziv"]').first().text().trim()
+      || $el.find('a').first().text().trim();
+
+    // Price: look for € sign or "EUR" or dedicated price element
+    const priceEl = $el.find('[class*="price"], [class*="cena"], [class*="Price"]').first();
+    const priceText = priceEl.text() || $el.text().match(/[\d\.\s]+\s*€/)?.[0] || '';
+    const price = parsePrice(priceText);
+
+    // Year and km from detail rows or text
+    const detailText = $el.find('[class*="detail"], [class*="info"], [class*="param"], table, .details').text();
+    const allText = $el.text();
+
+    const year = parseYear(detailText) || parseYear(allText);
+    const kmMatch = (detailText + allText).match(/(\d[\d\.\s]+)\s*km/i);
+    const km = kmMatch ? parseKm(kmMatch[1]) : null;
+
+    const engine = $el.find('[class*="engine"], [class*="motor"]').first().text().trim() || '';
+    const location = $el.find('[class*="location"], [class*="lokacija"], [class*="city"], [class*="grad"]').first().text().trim() || '';
+
+    if (!price || price < MIN_PRICE) return;
+
+    const id = `${search.brand}-${search.model}-${price}-${km || 0}-${year || 0}`;
+    listings.push({ id, title, price, year, km, engine, location, link: fullLink, searchLabel: search.label });
+  });
+
+  return listings;
+}
+
+async function fetchListings(search, last24h = false) {
   const url = last24h
-    ? `https://www.polovniautomobili.com/auto-oglasi/poslednja24h?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&price_to=&year_from=&year_to=&modeltxt=&showOldNew=all&country=&city=&submit_1=&page=${page}&sort=`
-    : `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&sort=date_desc&showOldNew=all&page=${page}`;
-
-  const prompt = `Otvori ovaj URL i izvuci SVE oglase automobila: ${url}
-
-Za svaki oglas vrati JSON objekat sa poljima:
-- id: string (spoji marku+model+cenu+km+godiste, bez razmaka)
-- title: naziv oglasa
-- price: cena u EUR kao broj (samo cifre, bez znakova)
-- year: godina kao broj
-- km: kilometraža kao broj (samo cifre)
-- engine: motor
-- location: grad
-- link: URL oglasa
-
-Vrati ISKLJUCIVO validan JSON array (npr. [{"id":"...","price":12500,...}]).
-Bez teksta pre ili posle. Bez HTML. Ako nema oglasa, vrati [].`;
+    ? `https://www.polovniautomobili.com/auto-oglasi/poslednja24h?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&price_to=&year_from=&year_to=&modeltxt=&showOldNew=all&country=&city=&submit_1=&page=&sort=`
+    : `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&sort=date_desc&showOldNew=all&page=1`;
 
   try {
-    const response = await axios.post(
-      'https://api.anthropic.com/v1/messages',
-      {
-        model: 'claude-sonnet-4-6',
-        max_tokens: 4000,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        messages: [{ role: 'user', content: prompt }],
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-        },
-        timeout: 90000,
-      }
-    );
-
-    let text = '';
-    for (const block of response.data.content || []) {
-      if (block.type === 'text') text += block.text;
-    }
-
-    const parsed = extractJsonArray(text);
-    if (!parsed) {
-      console.error(`  Could not extract JSON. Raw text snippet: ${text.slice(0, 200)}`);
-      return [];
-    }
-
-    return parsed
-      .filter((l) => l.price && l.price >= MIN_PRICE)
-      .map((l) => ({ ...l, searchLabel: search.label }));
+    const html = await fetchPage(url);
+    return parseListings(html, search);
   } catch (err) {
-    console.error(`  Error page ${page}:`, err.message);
-    if (err.response) console.error('  API:', JSON.stringify(err.response.data));
+    console.error(`  Fetch error: ${err.message}`);
     return [];
   }
+}
+
+async function fetchBaseline(search) {
+  const results = [];
+  for (const page of [1, 2]) {
+    const url = `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&sort=date_desc&showOldNew=all&page=${page}`;
+    try {
+      const html = await fetchPage(url);
+      const listings = parseListings(html, search);
+      results.push(...listings);
+    } catch (err) {
+      console.error(`  Baseline page ${page} error: ${err.message}`);
+    }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  return results;
 }
 
 function calcMedian(prices) {
@@ -142,36 +217,35 @@ function scoreListing(listing, allListings) {
   const km = listing.km || 0;
   const others = allListings.filter((l) => l.id !== listing.id && l.price >= MIN_PRICE);
 
-  // 1. Najuži filter: isto godište ±2 + slična kilometraža ±40%
+  // 1. Best: same year ±2 + similar km ±40%
   let pool = others.filter((l) => {
     const yearOk = !year || !l.year || Math.abs(l.year - year) <= 2;
     const kmOk = !km || !l.km || (l.km >= km * 0.6 && l.km <= km * 1.4);
     return yearOk && kmOk;
   });
-
   let poolDesc = `${pool.length} oglasa (±2 god, slična km)`;
 
-  // 2. Fallback: samo godište ±3
+  // 2. Fallback: year ±3
   if (pool.length < 4) {
     pool = others.filter((l) => !year || !l.year || Math.abs(l.year - year) <= 3);
     poolDesc = `${pool.length} oglasa (±3 god)`;
   }
 
-  // 3. Fallback: svi oglasi tog modela
+  // 3. Fallback: all
   if (pool.length < 3) {
     pool = others;
     poolDesc = `${pool.length} oglasa modela`;
   }
 
   if (pool.length === 0) {
-    return { dealScore: 50, marketAvg: null, savings: 0, reason: 'Nedovoljno podataka za poređenje.' };
+    return { dealScore: 50, marketAvg: null, savings: 0, reason: 'Nedovoljno podataka.' };
   }
 
   const median = calcMedian(pool.map((l) => l.price));
   const savings = median - listing.price;
   const deviationPct = savings / median;
 
-  // 50 = na medijanu, +25 za svakih 10% ispod medijana, max 100
+  // 50 = at median, +25 per 10% below median
   const dealScore = Math.min(100, Math.max(0, Math.round(50 + deviationPct * 250)));
 
   const direction = savings > 0 ? 'ispod' : 'iznad';
@@ -190,66 +264,49 @@ function buildEmailHtml(deals) {
       (d) => `
     <tr style="border-bottom: 1px solid #eee;">
       <td style="padding: 12px 8px;">
-        <strong style="color: #1a1a2e;">${d.title}</strong><br>
-        <span style="font-size: 12px; color: #666;">${d.searchLabel} · ${d.year || '?'} · ${d.km ? d.km.toLocaleString('de-DE') + ' km' : '?'}</span>
+        <strong>${d.title}</strong><br>
+        <span style="font-size: 12px; color: #666;">${d.searchLabel} · ${d.year || '?'} · ${d.km ? d.km.toLocaleString('de-DE') + ' km' : '?'} · ${d.engine || '?'}</span>
       </td>
       <td style="padding: 12px 8px; text-align: center;">
-        <span style="
-          background: ${d.dealScore >= 80 ? '#00c853' : '#ff9100'};
-          color: white; padding: 4px 10px; border-radius: 20px;
-          font-weight: bold; font-size: 14px;
-        ">${d.dealScore}/100</span>
+        <span style="background:${d.dealScore >= 80 ? '#00c853' : '#ff9100'};color:white;padding:4px 10px;border-radius:20px;font-weight:bold;">${d.dealScore}/100</span>
       </td>
       <td style="padding: 12px 8px; text-align: right;">
-        <strong style="font-size: 16px; color: #1a1a2e;">${d.price?.toLocaleString('de-DE')} €</strong><br>
-        ${d.marketAvg ? `<span style="font-size: 12px; color: #999;">Median: ${d.marketAvg.toLocaleString('de-DE')} €</span>` : ''}
+        <strong>${d.price?.toLocaleString('de-DE')} €</strong><br>
+        ${d.marketAvg ? `<span style="font-size:12px;color:#999;">Median: ${d.marketAvg.toLocaleString('de-DE')} €</span>` : ''}
       </td>
+      <td style="padding: 12px 8px; text-align: center; color: #00c853;">
+        ${d.savings > 0 ? `▼ ${d.savings.toLocaleString('de-DE')} €` : ''}
+      </td>
+      <td style="padding: 12px 8px; font-size: 12px; color: #555;">${d.reason}</td>
       <td style="padding: 12px 8px; text-align: center;">
-        ${d.savings > 0 ? `<strong style="color: #00c853;">▼ ${d.savings.toLocaleString('de-DE')} €</strong>` : ''}
-      </td>
-      <td style="padding: 12px 8px; font-size: 12px; color: #555; max-width: 220px;">
-        ${d.reason}
-      </td>
-      <td style="padding: 12px 8px; text-align: center;">
-        ${d.link ? `<a href="${d.link}" style="color: #0066cc; font-size: 12px;">Pogledaj →</a>` : '-'}
+        ${d.link ? `<a href="${d.link}" style="color:#0066cc;">Pogledaj →</a>` : '-'}
       </td>
     </tr>`
     )
     .join('');
 
-  return `<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"></head>
-<body style="font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 20px;">
-  <div style="max-width: 900px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-    <div style="background: linear-gradient(135deg, #1a1a2e, #16213e); padding: 24px 32px;">
-      <h1 style="margin: 0; color: white; font-size: 22px;">Nova Top Ponuda!</h1>
-      <p style="margin: 8px 0 0; color: #aaa; font-size: 14px;">
-        ${deals.length} oglasa sa Deal Score ≥ ${MIN_DEAL_SCORE} · ${new Date().toLocaleString('sr-RS')}
-        · Cene poređene sa stvarnim medijanom sa sajta
-      </p>
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="font-family:Arial,sans-serif;background:#f5f5f5;padding:20px;">
+  <div style="max-width:900px;margin:0 auto;background:white;border-radius:8px;overflow:hidden;">
+    <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);padding:24px 32px;">
+      <h1 style="margin:0;color:white;">Nova Top Ponuda!</h1>
+      <p style="margin:8px 0 0;color:#aaa;font-size:14px;">${deals.length} oglasa · score ≥ ${MIN_DEAL_SCORE} · ${new Date().toLocaleString('sr-RS')} · Real market data</p>
     </div>
-    <div style="padding: 24px 32px;">
-      <table style="width: 100%; border-collapse: collapse;">
-        <thead>
-          <tr style="background: #f8f8f8; border-bottom: 2px solid #ddd;">
-            <th style="padding: 10px 8px; text-align: left; font-size: 12px; color: #666; text-transform: uppercase;">Oglas</th>
-            <th style="padding: 10px 8px; text-align: center; font-size: 12px; color: #666; text-transform: uppercase;">Score</th>
-            <th style="padding: 10px 8px; text-align: right; font-size: 12px; color: #666; text-transform: uppercase;">Cena</th>
-            <th style="padding: 10px 8px; text-align: center; font-size: 12px; color: #666; text-transform: uppercase;">Uštedina</th>
-            <th style="padding: 10px 8px; font-size: 12px; color: #666; text-transform: uppercase;">Analiza</th>
-            <th style="padding: 10px 8px; text-align: center; font-size: 12px; color: #666; text-transform: uppercase;">Link</th>
-          </tr>
-        </thead>
+    <div style="padding:24px 32px;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="background:#f8f8f8;border-bottom:2px solid #ddd;">
+          <th style="padding:10px 8px;text-align:left;font-size:12px;color:#666;">OGLAS</th>
+          <th style="padding:10px 8px;font-size:12px;color:#666;">SCORE</th>
+          <th style="padding:10px 8px;text-align:right;font-size:12px;color:#666;">CENA</th>
+          <th style="padding:10px 8px;font-size:12px;color:#666;">UŠTEDINA</th>
+          <th style="padding:10px 8px;font-size:12px;color:#666;">ANALIZA</th>
+          <th style="padding:10px 8px;font-size:12px;color:#666;">LINK</th>
+        </tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
-    <div style="padding: 16px 32px; background: #f8f8f8; border-top: 1px solid #eee; font-size: 11px; color: #999;">
-      Automatski monitoring · polovniautomobili.rs · Min cena: ${MIN_PRICE.toLocaleString('de-DE')} € · Min score: ${MIN_DEAL_SCORE} · Score baziran na stvarnim cenama sa sajta
-    </div>
   </div>
-</body>
-</html>`;
+</body></html>`;
 }
 
 async function sendEmail(deals) {
@@ -257,14 +314,12 @@ async function sendEmail(deals) {
     service: 'gmail',
     auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
   });
-
   await transporter.sendMail({
     from: `"Auto Monitor" <${GMAIL_USER}>`,
     to: NOTIFY_EMAIL,
-    subject: `${deals.length} nova top ponuda na polovniautomobili.rs (Score ${MIN_DEAL_SCORE}+)`,
+    subject: `${deals.length} top ponuda na polovniautomobili.rs (Score ${MIN_DEAL_SCORE}+)`,
     html: buildEmailHtml(deals),
   });
-
   console.log(`Email sent to ${NOTIFY_EMAIL} with ${deals.length} deals`);
 }
 
@@ -278,59 +333,46 @@ async function main() {
   for (const search of SEARCHES) {
     console.log(`\nFetching: ${search.label}`);
 
-    // Fetch new listings from last 24h + 2 pages of regular search for baseline
-    const [newListings, basePage1, basePage2] = await Promise.all([
-      fetchListingsPage(search, 1, true),
-      fetchListingsPage(search, 1, false),
-      fetchListingsPage(search, 2, false),
+    const [newListings, baselineListings] = await Promise.all([
+      fetchListings(search, true),
+      fetchBaseline(search),
     ]);
 
-    const baselineListings = [...basePage1, ...basePage2];
     const allListings = [...newListings, ...baselineListings];
-
-    if (allListings.length === 0) {
-      console.log(`  Nema oglasa.`);
-      continue;
-    }
-
     console.log(`  Novi (24h): ${newListings.length} | Baseline: ${baselineListings.length}`);
 
-    const unseenFromPage1 = newListings.filter((l) => !seen[l.id]);
-    console.log(`  Novih (neviđenih): ${unseenFromPage1.length}`);
+    if (allListings.length === 0) continue;
 
-    for (const listing of unseenFromPage1) {
-      const { dealScore, marketAvg, savings, reason } = scoreListing(listing, allListings);
-      console.log(`    ${listing.title}: score=${dealScore}, cena=${listing.price}€, median=${marketAvg}€`);
+    const unseenNew = newListings.filter((l) => !seen[l.id]);
+    console.log(`  Neviđenih novih: ${unseenNew.length}`);
 
-      if (dealScore >= MIN_DEAL_SCORE) {
-        newDeals.push({ ...listing, dealScore, marketAvg, savings, reason });
+    for (const listing of unseenNew) {
+      const scored = scoreListing(listing, allListings);
+      console.log(`    ${listing.title}: score=${scored.dealScore}, cena=${listing.price}€, median=${scored.marketAvg}€`);
+      if (scored.dealScore >= MIN_DEAL_SCORE) {
+        newDeals.push({ ...listing, ...scored });
       }
     }
 
-    // Mark all fetched as seen
-    for (const l of [...newListings, ...baselineListings]) {
+    for (const l of allListings) {
       if (!seen[l.id]) seen[l.id] = new Date().toISOString();
     }
 
-    await new Promise((r) => setTimeout(r, 1500));
+    await new Promise((r) => setTimeout(r, 2000));
   }
 
-  // Clean entries older than 7 days
   const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   for (const [id, date] of Object.entries(seen)) {
     if (date < cutoff) delete seen[id];
   }
-
   saveSeen(seen);
 
   console.log(`\nTotal top deals found: ${newDeals.length}`);
-
   if (newDeals.length > 0) {
     await sendEmail(newDeals);
   } else {
     console.log('Nema novih top ponuda, email se ne šalje.');
   }
-
   console.log('=== Done ===\n');
 }
 

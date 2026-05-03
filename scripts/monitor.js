@@ -9,9 +9,9 @@ const GMAIL_USER = process.env.GMAIL_USER;
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'goranruter1@gmail.com';
 const MIN_DEAL_SCORE = parseInt(process.env.MIN_DEAL_SCORE || '90');
-const MIN_PRICE = parseInt(process.env.MIN_PRICE || '10000');
-const MAX_PRICE = parseInt(process.env.MAX_PRICE || '20000');
-const MIN_YEAR = parseInt(process.env.MIN_YEAR || '2015');
+const MIN_PRICE = parseInt(process.env.MIN_PRICE || '8000');
+const MAX_PRICE = parseInt(process.env.MAX_PRICE || '12000');
+const MIN_YEAR = parseInt(process.env.MIN_YEAR || '2014');
 
 const SEEN_FILE = path.join(__dirname, '../seen_listings.json');
 

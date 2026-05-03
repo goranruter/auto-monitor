@@ -410,10 +410,13 @@ async function fetchListings(search, last24h = false) {
 
 async function fetchBaseline(search) {
   const results = [];
-  for (const p of [1, 2]) {
-    const url = `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&price_to=${MAX_PRICE}&year_from=${MIN_YEAR}&sort=date_desc&showOldNew=all&page=${p}`;
+  let page = 1;
+  while (true) {
+    const url = `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&price_to=${MAX_PRICE}&year_from=${MIN_YEAR}&sort=date_desc&showOldNew=all&page=${page}`;
     const listings = await fetchListingsFromPage(url, search);
+    if (listings.length === 0) break;
     results.push(...listings);
+    page++;
     await new Promise((r) => setTimeout(r, 1000));
   }
   return results;

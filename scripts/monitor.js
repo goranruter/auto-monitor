@@ -99,6 +99,7 @@ Vrati SAMO JSON array. Ako ne možeš pristupiti URL-u, vrati prazan array [].`;
       .map((l) => ({ ...l, searchLabel: search.label }));
   } catch (err) {
     console.error(`Error fetching ${search.label}:`, err.message);
+    if (err.response) console.error('API response:', JSON.stringify(err.response.data));
     return [];
   }
 }

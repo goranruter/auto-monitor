@@ -8,7 +8,7 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GMAIL_USER = process.env.GMAIL_USER;
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'goranruter1@gmail.com';
-const MIN_DEAL_SCORE = parseInt(process.env.MIN_DEAL_SCORE || '100');
+const MIN_DEAL_SCORE = parseInt(process.env.MIN_DEAL_SCORE || '90');
 const MIN_PRICE = parseInt(process.env.MIN_PRICE || '10000');
 
 const SEEN_FILE = path.join(__dirname, '../seen_listings.json');
@@ -34,12 +34,39 @@ const SEARCHES = [
   { brand: 'renault', model: 'megane', label: 'Renault Megane' },
 ];
 
+const BASE_URL = 'https://www.polovniautomobili.com';
+
 const HTTP_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-  'Accept-Language': 'sr-RS,sr;q=0.9,en;q=0.8',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'sr-RS,sr;q=0.9,en-US;q=0.8,en;q=0.7',
   'Accept-Encoding': 'gzip, deflate, br',
+  'Connection': 'keep-alive',
+  'Upgrade-Insecure-Requests': '1',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'same-origin',
+  'Cache-Control': 'max-age=0',
 };
+
+let sessionCookies = '';
+
+async function initSession() {
+  try {
+    const res = await axios.get(BASE_URL, {
+      headers: HTTP_HEADERS,
+      timeout: 15000,
+      maxRedirects: 5,
+    });
+    const setCookie = res.headers['set-cookie'];
+    if (setCookie) {
+      sessionCookies = setCookie.map((c) => c.split(';')[0]).join('; ');
+      console.log(`Session initialized, cookies: ${sessionCookies.slice(0, 80)}...`);
+    }
+  } catch (err) {
+    console.error(`Session init error: ${err.message}`);
+  }
+}
 
 function loadSeen() {
   try {
@@ -72,7 +99,18 @@ function parseYear(str) {
 }
 
 async function fetchPage(url) {
-  const res = await axios.get(url, { headers: HTTP_HEADERS, timeout: 30000 });
+  const headers = {
+    ...HTTP_HEADERS,
+    'Referer': BASE_URL + '/',
+    ...(sessionCookies ? { 'Cookie': sessionCookies } : {}),
+  };
+  const res = await axios.get(url, { headers, timeout: 30000, maxRedirects: 5 });
+  // Capture any new cookies
+  const setCookie = res.headers['set-cookie'];
+  if (setCookie) {
+    const newCookies = setCookie.map((c) => c.split(';')[0]).join('; ');
+    sessionCookies = sessionCookies ? `${sessionCookies}; ${newCookies}` : newCookies;
+  }
   return res.data;
 }
 
@@ -326,6 +364,8 @@ async function sendEmail(deals) {
 async function main() {
   console.log(`\n=== Auto Monitor Start: ${new Date().toISOString()} ===`);
   console.log(`Min price: ${MIN_PRICE}€ | Min deal score: ${MIN_DEAL_SCORE} | Searches: ${SEARCHES.length}`);
+
+  await initSession();
 
   const seen = loadSeen();
   const newDeals = [];

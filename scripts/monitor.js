@@ -8,7 +8,7 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GMAIL_USER = process.env.GMAIL_USER;
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'goranruter1@gmail.com';
-const MIN_DEAL_SCORE = parseInt(process.env.MIN_DEAL_SCORE || '90');
+const MIN_DEAL_SCORE = parseInt(process.env.MIN_DEAL_SCORE || '80');
 const MIN_PRICE = parseInt(process.env.MIN_PRICE || '8000');
 const MAX_PRICE = parseInt(process.env.MAX_PRICE || '12000');
 const MIN_YEAR = parseInt(process.env.MIN_YEAR || '2014');
@@ -26,6 +26,16 @@ const SEARCHES = [
   { brand: 'ford',          model: 'kuga',     label: 'Ford Kuga' },
   { brand: 'peugeot',       model: '3008',     label: 'Peugeot 3008' },
   { brand: 'mercedes-benz', model: 'glc',      label: 'Mercedes GLC' },
+  { brand: 'bmw',           model: 'x3',       label: 'BMW X3' },
+  { brand: 'bmw',           model: 'x1',       label: 'BMW X1' },
+  { brand: 'audi',          model: 'q5',       label: 'Audi Q5' },
+  { brand: 'audi',          model: 'q3',       label: 'Audi Q3' },
+  { brand: 'volkswagen',    model: 'touareg',  label: 'VW Touareg' },
+  { brand: 'hyundai',       model: 'ix35',     label: 'Hyundai ix35' },
+  { brand: 'jeep',          model: 'compass',  label: 'Jeep Compass' },
+  { brand: 'mitsubishi',    model: 'outlander',label: 'Mitsubishi Outlander' },
+  { brand: 'honda',         model: 'cr-v',     label: 'Honda CR-V' },
+  { brand: 'renault',       model: 'kadjar',   label: 'Renault Kadjar' },
 ];
 
 let browser = null;

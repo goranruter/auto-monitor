@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git remote *)"
+      "Bash(git remote *)",
+      "Bash(ssh-add -l)",
+      "Bash(ssh-add --apple-use-keychain ~/.ssh/id_ed25519_github_personal)"
     ]
   }
 }

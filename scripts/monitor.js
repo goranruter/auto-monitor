@@ -180,8 +180,9 @@ async function fetchListingsFromPage(url, search) {
       const listings = [];
 
       // Find all links pointing to individual ad pages
+      // Link must end with a numeric ID (e.g. /auto-oglasi/volkswagen/golf/123456)
       const adLinks = Array.from(document.querySelectorAll('a[href*="/auto-oglasi/"]'))
-        .filter(a => /\/auto-oglasi\/[^/]+\/[^/]+/.test(a.href) && !a.href.includes('pretraga') && !a.href.includes('poslednja'));
+        .filter(a => /\/auto-oglasi\/[^/]+\/[^/]+\/\d+/.test(a.href));
 
       // Get unique article containers
       const seen = new Set();
@@ -199,12 +200,17 @@ async function fetchListingsFromPage(url, search) {
         if (!el || seen.has(el)) continue;
         seen.add(el);
 
-        const text = el.innerText || '';
-        const html = el.innerHTML || '';
+        // Skip promoted/sponsored/featured containers
+        const elClass = (el.className || '').toLowerCase();
+        const elHtml = el.outerHTML?.slice(0, 300).toLowerCase() || '';
+        if (/promot|sponsor|featured|top-oglas|istaknuto|premium/.test(elClass + elHtml)) continue;
 
-        // Title: from heading or link text
+        const text = el.innerText || '';
+
+        // Title: first line only from heading (avoid bleed-in of promo text)
         const heading = el.querySelector('h2, h3, h4, [class*="title"], [class*="naziv"]');
-        const title = heading?.innerText?.trim() || link.innerText?.trim() || '';
+        const rawTitle = heading?.innerText?.trim() || link.innerText?.trim() || '';
+        const title = rawTitle.split('\n')[0].trim();
         if (!title || title.length < 3) continue;
 
         // Keyword filter — ensure listing actually matches the intended model
@@ -213,8 +219,9 @@ async function fetchListingsFromPage(url, search) {
           if (!keywords.some(kw => titleLower.includes(kw.toLowerCase()))) continue;
         }
 
-        // Link
+        // Link — must be a direct listing URL with numeric ID
         const href = link.href || '';
+        if (!/\/\d+$/.test(href.replace(/\/$/, ''))) continue;
 
         // Image
         const img = el.querySelector('img');

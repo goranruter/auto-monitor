@@ -177,7 +177,7 @@ function parseListings(html, search) {
     const allText = $el.text();
 
     const year = parseYear(detailText) || parseYear(allText);
-    const kmMatch = (detailText + allText).match(/(\d[\d\.\s]+)\s*km/i);
+    const kmMatch = (detailText + allText).match(/\b(\d{1,3}(?:[.\s]\d{3}){0,1})\s*km\b/i);
     const km = kmMatch ? parseKm(kmMatch[1]) : null;
 
     const engine = $el.find('[class*="engine"], [class*="motor"]').first().text().trim() || '';

@@ -90,7 +90,8 @@ Vrati SAMO JSON array. Ako ne možeš pristupiti URL-u, vrati prazan array [].`;
       if (block.type === 'text') text += block.text;
     }
 
-    const match = text.match(/\[[\s\S]+?\]/);
+    const clean = text.replace(/```json|```/g, '').trim();
+    const match = clean.match(/\[[\s\S]+\]/);
     if (!match) return [];
 
     const listings = JSON.parse(match[0]);

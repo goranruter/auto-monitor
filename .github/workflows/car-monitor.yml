@@ -1,0 +1,39 @@
+name: car-monitor
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '*/15 * * * *' # run every 15 minutes; adjust as needed
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run monitor
+        run: node scripts/monitor.js
+
+      - name: Commit seen_listings.json if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add seen_listings.json || true
+          if git diff --staged --quiet; then
+            echo "no changes to commit"
+          else
+            git commit -m "chore: update seen_listings.json"
+            git push
+          fi

@@ -382,13 +382,16 @@ async function fetchListings(search, last24h = false) {
 async function fetchBaseline(search) {
   const results = [];
   let page = 1;
+  let thinStreak = 0; // consecutive pages with ≤2 listings
   while (true) {
     const url = `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&price_to=${MAX_PRICE}&year_from=${MIN_YEAR}&sort=date_desc&showOldNew=all&page=${page}`;
     const listings = await fetchListingsFromPage(url, search);
     if (listings.length === 0) break;
     results.push(...listings);
+    thinStreak = listings.length <= 2 ? thinStreak + 1 : 0;
+    if (thinStreak >= 10) break; // 10 consecutive near-empty pages → stop
     page++;
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 500));
   }
   return results;
 }

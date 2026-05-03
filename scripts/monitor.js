@@ -16,26 +16,26 @@ const MIN_YEAR = parseInt(process.env.MIN_YEAR || '2014');
 const SEEN_FILE = path.join(__dirname, '../seen_listings.json');
 
 const SEARCHES = [
-  { brand: 'nissan',        model: 'qashqai',  label: 'Nissan Qashqai' },
-  { brand: 'volkswagen',    model: 'tiguan',   label: 'VW Tiguan' },
-  { brand: 'skoda',         model: 'kodiaq',   label: 'Skoda Kodiaq' },
-  { brand: 'hyundai',       model: 'tucson',   label: 'Hyundai Tucson' },
-  { brand: 'kia',           model: 'sportage', label: 'Kia Sportage' },
-  { brand: 'toyota',        model: 'rav4',     label: 'Toyota RAV4' },
-  { brand: 'mazda',         model: 'cx-5',     label: 'Mazda CX-5' },
-  { brand: 'ford',          model: 'kuga',     label: 'Ford Kuga' },
-  { brand: 'peugeot',       model: '3008',     label: 'Peugeot 3008' },
-  { brand: 'mercedes-benz', model: 'glc',      label: 'Mercedes GLC' },
-  { brand: 'bmw',           model: 'x3',       label: 'BMW X3' },
-  { brand: 'bmw',           model: 'x1',       label: 'BMW X1' },
-  { brand: 'audi',          model: 'q5',       label: 'Audi Q5' },
-  { brand: 'audi',          model: 'q3',       label: 'Audi Q3' },
-  { brand: 'volkswagen',    model: 'touareg',  label: 'VW Touareg' },
-  { brand: 'hyundai',       model: 'ix35',     label: 'Hyundai ix35' },
-  { brand: 'jeep',          model: 'compass',  label: 'Jeep Compass' },
-  { brand: 'mitsubishi',    model: 'outlander',label: 'Mitsubishi Outlander' },
-  { brand: 'honda',         model: 'cr-v',     label: 'Honda CR-V' },
-  { brand: 'renault',       model: 'kadjar',   label: 'Renault Kadjar' },
+  { brand: 'nissan',        model: 'qashqai',   label: 'Nissan Qashqai',        keywords: ['qashqai'] },
+  { brand: 'volkswagen',    model: 'tiguan',    label: 'VW Tiguan',             keywords: ['tiguan'] },
+  { brand: 'skoda',         model: 'kodiaq',    label: 'Skoda Kodiaq',          keywords: ['kodiaq'] },
+  { brand: 'hyundai',       model: 'tucson',    label: 'Hyundai Tucson',        keywords: ['tucson'] },
+  { brand: 'kia',           model: 'sportage',  label: 'Kia Sportage',          keywords: ['sportage'] },
+  { brand: 'toyota',        model: 'rav4',      label: 'Toyota RAV4',           keywords: ['rav4', 'rav 4'] },
+  { brand: 'mazda',         model: 'cx-5',      label: 'Mazda CX-5',            keywords: ['cx-5', 'cx5'] },
+  { brand: 'ford',          model: 'kuga',      label: 'Ford Kuga',             keywords: ['kuga'] },
+  { brand: 'peugeot',       model: '3008',      label: 'Peugeot 3008',          keywords: ['3008'] },
+  { brand: 'mercedes-benz', model: 'glc',       label: 'Mercedes GLC',          keywords: ['glc'] },
+  { brand: 'bmw',           model: 'x3',        label: 'BMW X3',                keywords: ['x3'] },
+  { brand: 'bmw',           model: 'x1',        label: 'BMW X1',                keywords: ['x1'] },
+  { brand: 'audi',          model: 'q5',        label: 'Audi Q5',               keywords: ['q5'] },
+  { brand: 'audi',          model: 'q3',        label: 'Audi Q3',               keywords: ['q3'] },
+  { brand: 'volkswagen',    model: 'touareg',   label: 'VW Touareg',            keywords: ['touareg'] },
+  { brand: 'hyundai',       model: 'ix35',      label: 'Hyundai ix35',          keywords: ['ix35'] },
+  { brand: 'jeep',          model: 'compass',   label: 'Jeep Compass',          keywords: ['compass'] },
+  { brand: 'mitsubishi',    model: 'outlander', label: 'Mitsubishi Outlander',  keywords: ['outlander'] },
+  { brand: 'honda',         model: 'cr-v',      label: 'Honda CR-V',            keywords: ['cr-v', 'crv'] },
+  { brand: 'renault',       model: 'kadjar',    label: 'Renault Kadjar',        keywords: ['kadjar'] },
 ];
 
 let browser = null;
@@ -150,7 +150,7 @@ async function fetchListingsFromPage(url, search) {
     await page.waitForTimeout(2000);
 
     const results = await page.evaluate((params) => {
-      const { brand, model, label, MIN_PRICE, MAX_PRICE, MIN_YEAR } = params;
+      const { brand, model, label, keywords, MIN_PRICE, MAX_PRICE, MIN_YEAR } = params;
       const listings = [];
 
       // Find all links pointing to individual ad pages
@@ -180,6 +180,12 @@ async function fetchListingsFromPage(url, search) {
         const heading = el.querySelector('h2, h3, h4, [class*="title"], [class*="naziv"]');
         const title = heading?.innerText?.trim() || link.innerText?.trim() || '';
         if (!title || title.length < 3) continue;
+
+        // Keyword filter — ensure listing actually matches the intended model
+        if (keywords && keywords.length > 0) {
+          const titleLower = title.toLowerCase();
+          if (!keywords.some(kw => titleLower.includes(kw.toLowerCase()))) continue;
+        }
 
         // Link
         const href = link.href || '';
@@ -267,7 +273,7 @@ async function fetchListingsFromPage(url, search) {
       }
 
       return listings;
-    }, { brand: search.brand, model: search.model, label: search.label, MIN_PRICE, MAX_PRICE, MIN_YEAR });
+    }, { brand: search.brand, model: search.model, label: search.label, keywords: search.keywords || [], MIN_PRICE, MAX_PRICE, MIN_YEAR });
 
     console.log(`  [${url.includes('poslednja24h') ? '24h' : 'baseline'}] Found ${results.length} listings`);
     return results;

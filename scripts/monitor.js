@@ -7,7 +7,7 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GMAIL_USER = process.env.GMAIL_USER;
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'goranruter1@gmail.com';
-const MIN_DEAL_SCORE = parseInt(process.env.MIN_DEAL_SCORE || '70');
+const MIN_DEAL_SCORE = parseInt(process.env.MIN_DEAL_SCORE || '100');
 const MIN_PRICE = parseInt(process.env.MIN_PRICE || '10000');
 
 const SEEN_FILE = path.join(__dirname, '../seen_listings.json');
@@ -45,8 +45,10 @@ function saveSeen(seen) {
   fs.writeFileSync(SEEN_FILE, JSON.stringify(seen, null, 2));
 }
 
-async function fetchListingsPage(search, page) {
-  const url = `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&sort=date_desc&showOldNew=all&page=${page}`;
+async function fetchListingsPage(search, page, last24h = false) {
+  const url = last24h
+    ? `https://www.polovniautomobili.com/auto-oglasi/poslednja24h?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&page=${page}`
+    : `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&sort=date_desc&showOldNew=all&page=${page}`;
 
   const prompt = `Pretraži URL: ${url}
 
@@ -100,46 +102,55 @@ Vrati SAMO JSON array, bez objašnjenja. Ako ne možeš pristupiti URL-u, vrati 
   }
 }
 
-// Trim outliers and calculate median from real listing data
-function calcMarketStats(listings, targetYear) {
-  const similar = listings.filter(
-    (l) => l.price >= MIN_PRICE && (!targetYear || Math.abs((l.year || 0) - targetYear) <= 3)
-  );
-
-  const pool = similar.length >= 5 ? similar : listings;
-  if (pool.length === 0) return null;
-
-  const prices = pool.map((l) => l.price).sort((a, b) => a - b);
-  const cut = Math.floor(prices.length * 0.1);
-  const trimmed = prices.slice(cut, prices.length - cut || undefined);
-  const avg = Math.round(trimmed.reduce((s, p) => s + p, 0) / trimmed.length);
-  const median = trimmed[Math.floor(trimmed.length / 2)];
-
-  return { avg, median, sampleSize: trimmed.length };
+function calcMedian(prices) {
+  const sorted = [...prices].sort((a, b) => a - b);
+  const cut = Math.floor(sorted.length * 0.1);
+  const trimmed = sorted.slice(cut, sorted.length - cut || undefined);
+  return trimmed[Math.floor(trimmed.length / 2)];
 }
 
 function scoreListing(listing, allListings) {
-  const stats = calcMarketStats(
-    allListings.filter((l) => l.id !== listing.id),
-    listing.year
-  );
+  const year = listing.year || 0;
+  const km = listing.km || 0;
+  const others = allListings.filter((l) => l.id !== listing.id && l.price >= MIN_PRICE);
 
-  if (!stats || stats.sampleSize < 3) {
+  // 1. Najuži filter: isto godište ±2 + slična kilometraža ±40%
+  let pool = others.filter((l) => {
+    const yearOk = !year || !l.year || Math.abs(l.year - year) <= 2;
+    const kmOk = !km || !l.km || (l.km >= km * 0.6 && l.km <= km * 1.4);
+    return yearOk && kmOk;
+  });
+
+  let poolDesc = `${pool.length} oglasa (±2 god, slična km)`;
+
+  // 2. Fallback: samo godište ±3
+  if (pool.length < 4) {
+    pool = others.filter((l) => !year || !l.year || Math.abs(l.year - year) <= 3);
+    poolDesc = `${pool.length} oglasa (±3 god)`;
+  }
+
+  // 3. Fallback: svi oglasi tog modela
+  if (pool.length < 3) {
+    pool = others;
+    poolDesc = `${pool.length} oglasa modela`;
+  }
+
+  if (pool.length === 0) {
     return { dealScore: 50, marketAvg: null, savings: 0, reason: 'Nedovoljno podataka za poređenje.' };
   }
 
-  const { median, sampleSize } = stats;
+  const median = calcMedian(pool.map((l) => l.price));
   const savings = median - listing.price;
   const deviationPct = savings / median;
 
-  // 50 = at median, +25 per 10% below median, max 100
+  // 50 = na medijanu, +25 za svakih 10% ispod medijana, max 100
   const dealScore = Math.min(100, Math.max(0, Math.round(50 + deviationPct * 250)));
 
   const direction = savings > 0 ? 'ispod' : 'iznad';
   const reason =
     `Cena ${listing.price.toLocaleString('de-DE')}€ je ${Math.abs(Math.round(deviationPct * 100))}% ` +
-    `${direction} tržišnog mediana (${median.toLocaleString('de-DE')}€) ` +
-    `na osnovu ${sampleSize} oglasa sa sajta.`;
+    `${direction} medijana (${median.toLocaleString('de-DE')}€) ` +
+    `na osnovu ${poolDesc} sa sličnim godištem${km ? ' i kilometražom' : ''}.`;
 
   return { dealScore, marketAvg: median, savings, reason };
 }
@@ -239,22 +250,24 @@ async function main() {
   for (const search of SEARCHES) {
     console.log(`\nFetching: ${search.label}`);
 
-    // Fetch 2 pages to get enough data for a reliable market baseline
-    const [page1, page2] = await Promise.all([
-      fetchListingsPage(search, 1),
-      fetchListingsPage(search, 2),
+    // Fetch new listings from last 24h + 2 pages of regular search for baseline
+    const [newListings, basePage1, basePage2] = await Promise.all([
+      fetchListingsPage(search, 1, true),
+      fetchListingsPage(search, 1, false),
+      fetchListingsPage(search, 2, false),
     ]);
 
-    const allListings = [...page1, ...page2];
+    const baselineListings = [...basePage1, ...basePage2];
+    const allListings = [...newListings, ...baselineListings];
+
     if (allListings.length === 0) {
       console.log(`  Nema oglasa.`);
       continue;
     }
 
-    console.log(`  Ukupno oglasa: ${allListings.length} (stranica 1: ${page1.length}, stranica 2: ${page2.length})`);
+    console.log(`  Novi (24h): ${newListings.length} | Baseline: ${baselineListings.length}`);
 
-    // Only score page1 listings as "new" — page2 is baseline data only
-    const unseenFromPage1 = page1.filter((l) => !seen[l.id]);
+    const unseenFromPage1 = newListings.filter((l) => !seen[l.id]);
     console.log(`  Novih (neviđenih): ${unseenFromPage1.length}`);
 
     for (const listing of unseenFromPage1) {
@@ -267,7 +280,7 @@ async function main() {
     }
 
     // Mark all fetched as seen
-    for (const l of allListings) {
+    for (const l of [...newListings, ...baselineListings]) {
       if (!seen[l.id]) seen[l.id] = new Date().toISOString();
     }
 

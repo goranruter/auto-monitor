@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: '*/15 * * * *' # run every 15 minutes; adjust as needed
+    - cron: '0 * * * *' # run every hour
   workflow_dispatch:
 
 jobs:

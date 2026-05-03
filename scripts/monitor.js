@@ -4,18 +4,19 @@ const nodemailer = require('nodemailer');
 const fs = require('fs');
 const path = require('path');
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GMAIL_USER = process.env.GMAIL_USER;
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
-const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'goranruter1@gmail.com';
 const MIN_DEAL_SCORE = parseInt(process.env.MIN_DEAL_SCORE || '80');
 const MIN_PRICE = parseInt(process.env.MIN_PRICE || '8000');
 const MAX_PRICE = parseInt(process.env.MAX_PRICE || '12000');
 const MIN_YEAR = parseInt(process.env.MIN_YEAR || '2014');
 
-const SEEN_FILE = path.join(__dirname, '../seen_listings.json');
+// MONITOR_TYPE: 'suv' (default) or 'cars'
+const MONITOR_TYPE = (process.env.MONITOR_TYPE || 'suv').toLowerCase();
+const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'goranruter1@gmail.com';
+const SEEN_FILE = path.join(__dirname, `../seen_${MONITOR_TYPE}.json`);
 
-const SEARCHES = [
+const SEARCHES_SUV = [
   { brand: 'nissan',        model: 'qashqai',   label: 'Nissan Qashqai',        keywords: ['qashqai'] },
   { brand: 'volkswagen',    model: 'tiguan',    label: 'VW Tiguan',             keywords: ['tiguan'] },
   { brand: 'skoda',         model: 'kodiaq',    label: 'Skoda Kodiaq',          keywords: ['kodiaq'] },
@@ -37,6 +38,31 @@ const SEARCHES = [
   { brand: 'honda',         model: 'cr-v',      label: 'Honda CR-V',            keywords: ['cr-v', 'crv'] },
   { brand: 'renault',       model: 'kadjar',    label: 'Renault Kadjar',        keywords: ['kadjar'] },
 ];
+
+const SEARCHES_CARS = [
+  { brand: 'volkswagen',    model: 'golf',      label: 'VW Golf',               keywords: ['golf'] },
+  { brand: 'volkswagen',    model: 'passat',    label: 'VW Passat',             keywords: ['passat'] },
+  { brand: 'skoda',         model: 'octavia',   label: 'Skoda Octavia',         keywords: ['octavia'] },
+  { brand: 'skoda',         model: 'superb',    label: 'Skoda Superb',          keywords: ['superb'] },
+  { brand: 'seat',          model: 'leon',      label: 'Seat Leon',             keywords: ['leon'] },
+  { brand: 'audi',          model: 'a4',        label: 'Audi A4',               keywords: ['a4'] },
+  { brand: 'audi',          model: 'a6',        label: 'Audi A6',               keywords: ['a6'] },
+  { brand: 'bmw',           model: 'serija-3',  label: 'BMW Serija 3',          keywords: ['serija 3', '320', '318', '316', '330', '325'] },
+  { brand: 'bmw',           model: 'serija-5',  label: 'BMW Serija 5',          keywords: ['serija 5', '520', '525', '530', '518', '535'] },
+  { brand: 'mercedes-benz', model: 'c-klasa',   label: 'Mercedes C',            keywords: ['c-klasa', 'c klasa', 'c180', 'c200', 'c220', 'c250'] },
+  { brand: 'mercedes-benz', model: 'e-klasa',   label: 'Mercedes E',            keywords: ['e-klasa', 'e klasa', 'e200', 'e220', 'e250', 'e300'] },
+  { brand: 'opel',          model: 'astra',     label: 'Opel Astra',            keywords: ['astra'] },
+  { brand: 'opel',          model: 'insignia',  label: 'Opel Insignia',         keywords: ['insignia'] },
+  { brand: 'ford',          model: 'focus',     label: 'Ford Focus',            keywords: ['focus'] },
+  { brand: 'ford',          model: 'mondeo',    label: 'Ford Mondeo',           keywords: ['mondeo'] },
+  { brand: 'renault',       model: 'megane',    label: 'Renault Megane',        keywords: ['megane'] },
+  { brand: 'peugeot',       model: '308',       label: 'Peugeot 308',           keywords: ['308'] },
+  { brand: 'toyota',        model: 'auris',     label: 'Toyota Auris',          keywords: ['auris'] },
+  { brand: 'hyundai',       model: 'i30',       label: 'Hyundai i30',           keywords: ['i30'] },
+  { brand: 'kia',           model: 'ceed',      label: 'Kia Ceed',              keywords: ['ceed'] },
+];
+
+const SEARCHES = MONITOR_TYPE === 'cars' ? SEARCHES_CARS : SEARCHES_SUV;
 
 let browser = null;
 let browserContext = null;

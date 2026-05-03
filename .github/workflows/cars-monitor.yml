@@ -1,9 +1,7 @@
-name: car-monitor
+name: cars-monitor
 on:
-  push:
-    branches: [main]
   schedule:
-    - cron: '0 * * * *' # run every hour
+    - cron: '30 * * * *' # every hour at :30
   workflow_dispatch:
 
 jobs:
@@ -19,21 +17,23 @@ jobs:
       - name: Install dependencies
         run: npm ci && npx playwright install chromium
 
-      - name: Run monitor
+      - name: Run cars monitor
         run: node scripts/monitor.js
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MONITOR_TYPE: cars
+          NOTIFY_EMAIL: ${{ secrets.NOTIFY_EMAIL_CARS }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
 
-      - name: Commit seen_listings.json if changed
+      - name: Commit seen_cars.json if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add seen_listings.json || true
+          git pull --rebase || true
+          git add seen_cars.json || true
           if git diff --staged --quiet; then
             echo "no changes to commit"
           else
-            git commit -m "chore: update seen_listings.json"
+            git commit -m "chore: update seen_cars.json"
             git push
           fi

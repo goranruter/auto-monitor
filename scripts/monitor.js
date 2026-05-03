@@ -10,6 +10,8 @@ const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'goranruter1@gmail.com';
 const MIN_DEAL_SCORE = parseInt(process.env.MIN_DEAL_SCORE || '90');
 const MIN_PRICE = parseInt(process.env.MIN_PRICE || '10000');
+const MAX_PRICE = parseInt(process.env.MAX_PRICE || '20000');
+const MIN_YEAR = parseInt(process.env.MIN_YEAR || '2015');
 
 const SEEN_FILE = path.join(__dirname, '../seen_listings.json');
 
@@ -183,10 +185,13 @@ function parseListings(html, search) {
     const engine = $el.find('[class*="engine"], [class*="motor"]').first().text().trim() || '';
     const location = $el.find('[class*="location"], [class*="lokacija"], [class*="city"], [class*="grad"]').first().text().trim() || '';
 
-    if (!price || price < MIN_PRICE) return;
+    if (!price || price < MIN_PRICE || price > MAX_PRICE) return;
+    if (year && year < MIN_YEAR) return;
+
+    const image = $el.find('img').first().attr('src') || $el.find('img').first().attr('data-src') || null;
 
     const id = `${search.brand}-${search.model}-${price}-${km || 0}-${year || 0}`;
-    listings.push({ id, title, price, year, km, engine, location, link: fullLink, searchLabel: search.label });
+    listings.push({ id, title, price, year, km, engine, location, link: fullLink, image, searchLabel: search.label });
   });
 
   return listings;
@@ -194,8 +199,8 @@ function parseListings(html, search) {
 
 async function fetchListings(search, last24h = false) {
   const url = last24h
-    ? `https://www.polovniautomobili.com/auto-oglasi/poslednja24h?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&price_to=&year_from=&year_to=&modeltxt=&showOldNew=all&country=&city=&submit_1=&page=&sort=`
-    : `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&sort=date_desc&showOldNew=all&page=1`;
+    ? `https://www.polovniautomobili.com/auto-oglasi/poslednja24h?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&price_to=${MAX_PRICE}&year_from=${MIN_YEAR}&year_to=&modeltxt=&showOldNew=all&country=&city=&submit_1=&page=&sort=`
+    : `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&price_to=${MAX_PRICE}&year_from=${MIN_YEAR}&sort=date_desc&showOldNew=all&page=1`;
 
   try {
     const html = await fetchPage(url);
@@ -209,7 +214,7 @@ async function fetchListings(search, last24h = false) {
 async function fetchBaseline(search) {
   const results = [];
   for (const page of [1, 2]) {
-    const url = `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&sort=date_desc&showOldNew=all&page=${page}`;
+    const url = `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&price_to=${MAX_PRICE}&year_from=${MIN_YEAR}&sort=date_desc&showOldNew=all&page=${page}`;
     try {
       const html = await fetchPage(url);
       const listings = parseListings(html, search);
@@ -280,6 +285,9 @@ function buildEmailHtml(deals) {
     .map(
       (d) => `
     <tr style="border-bottom: 1px solid #eee;">
+      <td style="padding: 12px 8px; width: 90px;">
+        ${d.image ? `<img src="${d.image}" style="width:80px;height:60px;object-fit:cover;border-radius:4px;" />` : '<div style="width:80px;height:60px;background:#eee;border-radius:4px;"></div>'}
+      </td>
       <td style="padding: 12px 8px;">
         <strong>${d.title}</strong><br>
         <span style="font-size: 12px; color: #666;">${d.searchLabel} · ${d.year || '?'} · ${d.km ? d.km.toLocaleString('de-DE') + ' km' : '?'} · ${d.engine || '?'}</span>
@@ -312,6 +320,7 @@ function buildEmailHtml(deals) {
     <div style="padding:24px 32px;">
       <table style="width:100%;border-collapse:collapse;">
         <thead><tr style="background:#f8f8f8;border-bottom:2px solid #ddd;">
+          <th style="padding:10px 8px;font-size:12px;color:#666;">SLIKA</th>
           <th style="padding:10px 8px;text-align:left;font-size:12px;color:#666;">OGLAS</th>
           <th style="padding:10px 8px;font-size:12px;color:#666;">SCORE</th>
           <th style="padding:10px 8px;text-align:right;font-size:12px;color:#666;">CENA</th>
@@ -362,10 +371,15 @@ async function main() {
 
     if (allListings.length === 0) continue;
 
-    const unseenNew = newListings.filter((l) => !seen[l.id]);
-    console.log(`  Neviđenih novih: ${unseenNew.length}`);
+    // Show listing if unseen OR if price changed since last time
+    const toScore = newListings.filter((l) => {
+      const prev = seen[l.id];
+      if (!prev) return true;
+      return prev.price !== l.price; // price changed — re-evaluate
+    });
+    console.log(`  Za analizu: ${toScore.length}`);
 
-    for (const listing of unseenNew) {
+    for (const listing of toScore) {
       const scored = scoreListing(listing, allListings);
       console.log(`    ${listing.title}: score=${scored.dealScore}, cena=${listing.price}€, median=${scored.marketAvg}€`);
       if (scored.dealScore >= MIN_DEAL_SCORE) {
@@ -374,14 +388,15 @@ async function main() {
     }
 
     for (const l of allListings) {
-      if (!seen[l.id]) seen[l.id] = new Date().toISOString();
+      seen[l.id] = { date: new Date().toISOString(), price: l.price };
     }
 
     await new Promise((r) => setTimeout(r, 2000));
   }
 
   const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  for (const [id, date] of Object.entries(seen)) {
+  for (const [id, val] of Object.entries(seen)) {
+    const date = typeof val === 'object' ? val.date : val;
     if (date < cutoff) delete seen[id];
   }
   saveSeen(seen);

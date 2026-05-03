@@ -45,24 +45,50 @@ function saveSeen(seen) {
   fs.writeFileSync(SEEN_FILE, JSON.stringify(seen, null, 2));
 }
 
+function extractJsonArray(text) {
+  // Strip markdown code blocks
+  const cleaned = text.replace(/```json\n?|```\n?/g, '').trim();
+
+  // Walk the string tracking bracket depth to find the outermost complete array
+  let depth = 0;
+  let start = -1;
+  for (let i = 0; i < cleaned.length; i++) {
+    if (cleaned[i] === '[') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (cleaned[i] === ']') {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        try {
+          return JSON.parse(cleaned.slice(start, i + 1));
+        } catch {
+          start = -1; // malformed, keep scanning
+        }
+      }
+    }
+  }
+  return null;
+}
+
 async function fetchListingsPage(search, page, last24h = false) {
   const url = last24h
-    ? `https://www.polovniautomobili.com/auto-oglasi/poslednja24h?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&page=${page}`
+    ? `https://www.polovniautomobili.com/auto-oglasi/poslednja24h?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&price_to=&year_from=&year_to=&modeltxt=&showOldNew=all&country=&city=&submit_1=&page=${page}&sort=`
     : `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&sort=date_desc&showOldNew=all&page=${page}`;
 
-  const prompt = `Pretraži URL: ${url}
+  const prompt = `Otvori ovaj URL i izvuci SVE oglase automobila: ${url}
 
-Izvuci SVE oglase automobila sa te stranice. Za svaki oglas vrati JSON sa:
-- id: jedinstveni string (kombiniraj marku+model+cenu+km+godiste)
+Za svaki oglas vrati JSON objekat sa poljima:
+- id: string (spoji marku+model+cenu+km+godiste, bez razmaka)
 - title: naziv oglasa
-- price: cena u EUR (broj, samo broj bez simbola)
-- year: godina (broj)
-- km: kilometraža (broj)
-- engine: motor/zapremina
+- price: cena u EUR kao broj (samo cifre, bez znakova)
+- year: godina kao broj
+- km: kilometraža kao broj (samo cifre)
+- engine: motor
 - location: grad
-- link: direktan link ka oglasu
+- link: URL oglasa
 
-Vrati SAMO JSON array, bez objašnjenja. Ako ne možeš pristupiti URL-u, vrati [].`;
+Vrati ISKLJUCIVO validan JSON array (npr. [{"id":"...","price":12500,...}]).
+Bez teksta pre ili posle. Bez HTML. Ako nema oglasa, vrati [].`;
 
   try {
     const response = await axios.post(
@@ -88,11 +114,13 @@ Vrati SAMO JSON array, bez objašnjenja. Ako ne možeš pristupiti URL-u, vrati 
       if (block.type === 'text') text += block.text;
     }
 
-    const clean = text.replace(/```json|```/g, '').trim();
-    const match = clean.match(/\[[\s\S]+\]/);
-    if (!match) return [];
+    const parsed = extractJsonArray(text);
+    if (!parsed) {
+      console.error(`  Could not extract JSON. Raw text snippet: ${text.slice(0, 200)}`);
+      return [];
+    }
 
-    return JSON.parse(match[0])
+    return parsed
       .filter((l) => l.price && l.price >= MIN_PRICE)
       .map((l) => ({ ...l, searchLabel: search.label }));
   } catch (err) {

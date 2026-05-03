@@ -16,24 +16,45 @@ const MIN_YEAR = parseInt(process.env.MIN_YEAR || '2014');
 const SEEN_FILE = path.join(__dirname, '../seen_listings.json');
 
 const SEARCHES = [
+  // VW Group
   { brand: 'volkswagen', model: 'golf', label: 'VW Golf' },
   { brand: 'volkswagen', model: 'passat', label: 'VW Passat' },
+  { brand: 'volkswagen', model: 'tiguan', label: 'VW Tiguan' },
+  { brand: 'volkswagen', model: 'touran', label: 'VW Touran' },
+  { brand: 'skoda', model: 'octavia', label: 'Skoda Octavia' },
+  { brand: 'skoda', model: 'superb', label: 'Skoda Superb' },
+  { brand: 'seat', model: 'leon', label: 'Seat Leon' },
+  // BMW
   { brand: 'bmw', model: 'serija-3', label: 'BMW Serija 3' },
   { brand: 'bmw', model: 'serija-5', label: 'BMW Serija 5' },
+  { brand: 'bmw', model: 'x1', label: 'BMW X1' },
+  // Audi
   { brand: 'audi', model: 'a4', label: 'Audi A4' },
   { brand: 'audi', model: 'a6', label: 'Audi A6' },
+  { brand: 'audi', model: 'q3', label: 'Audi Q3' },
+  // Mercedes
   { brand: 'mercedes-benz', model: 'c-klasa', label: 'Mercedes C' },
   { brand: 'mercedes-benz', model: 'e-klasa', label: 'Mercedes E' },
-  { brand: 'skoda', model: 'octavia', label: 'Skoda Octavia' },
-  { brand: 'toyota', model: 'camry', label: 'Toyota Camry' },
-  { brand: 'toyota', model: 'rav4', label: 'Toyota RAV4' },
+  // Ford
   { brand: 'ford', model: 'focus', label: 'Ford Focus' },
+  { brand: 'ford', model: 'mondeo', label: 'Ford Mondeo' },
+  // Opel
+  { brand: 'opel', model: 'astra', label: 'Opel Astra' },
   { brand: 'opel', model: 'insignia', label: 'Opel Insignia' },
+  // Hyundai / Kia
   { brand: 'hyundai', model: 'tucson', label: 'Hyundai Tucson' },
+  { brand: 'hyundai', model: 'ix35', label: 'Hyundai ix35' },
   { brand: 'kia', model: 'sportage', label: 'Kia Sportage' },
+  { brand: 'kia', model: 'ceed', label: 'Kia Ceed' },
+  // Toyota / Mazda
+  { brand: 'toyota', model: 'rav4', label: 'Toyota RAV4' },
+  { brand: 'toyota', model: 'auris', label: 'Toyota Auris' },
   { brand: 'mazda', model: 'cx-5', label: 'Mazda CX-5' },
-  { brand: 'peugeot', model: '508', label: 'Peugeot 508' },
+  // Nissan / Renault / Peugeot
+  { brand: 'nissan', model: 'qashqai', label: 'Nissan Qashqai' },
   { brand: 'renault', model: 'megane', label: 'Renault Megane' },
+  { brand: 'peugeot', model: '308', label: 'Peugeot 308' },
+  { brand: 'peugeot', model: '3008', label: 'Peugeot 3008' },
 ];
 
 let browser = null;

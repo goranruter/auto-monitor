@@ -215,8 +215,13 @@ async function fetchListingsFromPage(url, search) {
         else if (/tdi|cdi|hdi|dci|dizel|diesel|cdti/.test(t)) fuel = 'diesel';
         else if (/tsi|tfsi|fsi|benzin|petrol|mpi/.test(t)) fuel = 'petrol';
 
-        // Filter: max 2000cc except hybrids/electrics
-        if (engineCC && engineCC > 2000 && fuel !== 'hybrid' && fuel !== 'electric') continue;
+        // Filter: 1350–2000cc except hybrids/electrics (they can exceed 2000)
+        if (engineCC && fuel !== 'hybrid' && fuel !== 'electric') {
+          if (engineCC < 1350 || engineCC > 2000) continue;
+        }
+
+        // Filter: max 250 000 km
+        if (km && km > 250000) continue;
 
         // Location
         const locEl = el.querySelector('[class*="location"], [class*="lokacija"], [class*="city"], [class*="grad"]');

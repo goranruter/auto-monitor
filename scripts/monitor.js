@@ -111,8 +111,24 @@ function parseRegistrationMonths(text) {
   return Math.max(0, months);
 }
 
-// ~80€/month is rough registration cost in Serbia
-const REG_VALUE_PER_MONTH = 80;
+const RSD_TO_EUR = 117; // fixed exchange rate RSD → EUR
+const REG_VALUE_PER_MONTH_FALLBACK = 40; // fallback if RSD price not found
+
+// Parses "od 27.193 RSD do 31.136 RSD" → returns annual cost in EUR (average of min/max)
+function parseRegistrationCostEur(text) {
+  const match = text.match(/od\s+([\d\.,]+)\s*rsd\s+do\s+([\d\.,]+)\s*rsd/i);
+  if (!match) return null;
+  const min = parseInt(match[1].replace(/[^\d]/g, ''));
+  const max = parseInt(match[2].replace(/[^\d]/g, ''));
+  const avgRsd = (min + max) / 2;
+  return Math.round(avgRsd / RSD_TO_EUR);
+}
+
+function calcRegBonus(regMonths, annualCostEur) {
+  if (regMonths <= 0) return 0;
+  const monthlyRate = annualCostEur ? annualCostEur / 12 : REG_VALUE_PER_MONTH_FALLBACK;
+  return Math.round(regMonths * monthlyRate);
+}
 
 async function fetchPage(url) {
   const page = await browserContext.newPage();
@@ -223,10 +239,11 @@ function parseListings(html, search) {
     const fuel = detectFuel(fullText);
     const transmission = detectTransmission(fullText);
     const regMonths = parseRegistrationMonths(fullText);
-    const regBonus = regMonths * REG_VALUE_PER_MONTH;
+    const annualRegCostEur = parseRegistrationCostEur(fullText);
+    const regBonus = calcRegBonus(regMonths, annualRegCostEur);
 
     const id = `${search.brand}-${search.model}-${price}-${km || 0}-${year || 0}`;
-    listings.push({ id, title, price, year, km, engine, location, link: fullLink, image, fuel, transmission, regMonths, regBonus, searchLabel: search.label });
+    listings.push({ id, title, price, year, km, engine, location, link: fullLink, image, fuel, transmission, regMonths, annualRegCostEur, regBonus, searchLabel: search.label });
   });
 
   return listings;
@@ -327,7 +344,8 @@ function scoreListing(listing, allListings) {
   const fuelLabel = { diesel: 'dizel', petrol: 'benzin', hybrid: 'hibrid', electric: 'struja' }[fuel] || '';
   const transLabel = { automatic: 'automatik', manual: 'manuelni' }[transmission] || '';
   const extras = [fuelLabel, transLabel].filter(Boolean).join(', ');
-  const regNote = regBonus > 0 ? ` + ${listing.regMonths} mes. registracije (≈${regBonus}€)` : '';
+  const regCostNote = listing.annualRegCostEur ? `≈${listing.annualRegCostEur}€/god` : `≈${REG_VALUE_PER_MONTH_FALLBACK}€/mes`;
+  const regNote = regBonus > 0 ? ` + ${listing.regMonths} mes. reg. (${regCostNote}, bonus ≈${regBonus}€)` : '';
 
   const reason =
     `Efektivna cena ${effectivePrice.toLocaleString('de-DE')}€${regNote} je ${Math.abs(Math.round(deviationPct * 100))}% ` +

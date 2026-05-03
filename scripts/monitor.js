@@ -572,6 +572,20 @@ async function sendEmail(deals) {
   console.log(`Email sent to ${NOTIFY_EMAIL} with ${deals.length} deals`);
 }
 
+// Run fn over items with at most `concurrency` in-flight at once
+async function pMap(items, fn, concurrency = 5) {
+  const results = new Array(items.length);
+  let idx = 0;
+  async function worker() {
+    while (idx < items.length) {
+      const i = idx++;
+      results[i] = await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
+  return results;
+}
+
 async function main() {
   console.log(`\n=== Auto Monitor Start: ${new Date().toISOString()} ===`);
   console.log(`Min price: ${MIN_PRICE}€ | Min deal score: ${MIN_DEAL_SCORE} | Searches: ${SEARCHES.length}`);
@@ -581,22 +595,19 @@ async function main() {
   const seen = loadSeen();
   const newDeals = [];
 
-  // Phase 1: collect baseline listings from ALL models for a broad market pool
-  console.log('\n--- Phase 1: Fetching baseline listings for all models ---');
-  const globalBaseline = [];
-  for (const search of SEARCHES) {
+  // Phase 1: fetch all pages for all 30 models in parallel (5 concurrent)
+  console.log('\n--- Phase 1: Fetching baseline listings for all models (parallel) ---');
+  const baselineResults = await pMap(SEARCHES, async (search) => {
     const listings = await fetchBaseline(search);
-    globalBaseline.push(...listings);
     console.log(`  ${search.label}: ${listings.length} baseline listings`);
-    await new Promise((r) => setTimeout(r, 1000));
-  }
+    return listings;
+  }, 5);
+  const globalBaseline = baselineResults.flat();
   console.log(`Global baseline pool: ${globalBaseline.length} listings across all models`);
 
-  // Phase 2: check new (24h) listings for each model, score against full global pool
-  console.log('\n--- Phase 2: Checking new listings ---');
-  for (const search of SEARCHES) {
-    console.log(`\nFetching 24h: ${search.label}`);
-
+  // Phase 2: fetch 24h listings for all models in parallel (5 concurrent)
+  console.log('\n--- Phase 2: Checking new listings (parallel) ---');
+  const phase2Results = await pMap(SEARCHES, async (search) => {
     const rawListings = await fetchListings(search, true);
 
     // Deduplicate by ID — keep the entry with an image when there are duplicates
@@ -608,23 +619,20 @@ async function main() {
       }
     }
     const newListings = Array.from(dedupMap.values());
-    console.log(`  Novi (24h): ${newListings.length} (raw: ${rawListings.length})`);
+    console.log(`  ${search.label}: ${newListings.length} novi (raw: ${rawListings.length})`);
+    return newListings;
+  }, 5);
 
-    if (newListings.length === 0) {
-      await new Promise((r) => setTimeout(r, 1000));
-      continue;
-    }
+  for (const newListings of phase2Results) {
+    if (newListings.length === 0) continue;
 
-    // Score against all listings: new ones + entire global baseline
     const scoringPool = [...newListings, ...globalBaseline];
 
-    // Show listing if unseen OR if price changed since last time
     const toScore = newListings.filter((l) => {
       const prev = seen[l.id];
       if (!prev) return true;
       return prev.price !== l.price;
     });
-    console.log(`  Za analizu: ${toScore.length}`);
 
     for (const listing of toScore) {
       const scored = scoreListing(listing, scoringPool);
@@ -637,8 +645,6 @@ async function main() {
     for (const l of newListings) {
       seen[l.id] = { date: new Date().toISOString(), price: l.price };
     }
-
-    await new Promise((r) => setTimeout(r, 1000));
   }
 
   const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();

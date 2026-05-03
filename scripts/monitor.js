@@ -16,16 +16,16 @@ const MIN_YEAR = parseInt(process.env.MIN_YEAR || '2014');
 const SEEN_FILE = path.join(__dirname, '../seen_listings.json');
 
 const SEARCHES = [
-  { brand: 'volkswagen', model: 'golf',     label: 'VW Golf' },
-  { brand: 'volkswagen', model: 'passat',   label: 'VW Passat' },
-  { brand: 'skoda',      model: 'octavia',  label: 'Skoda Octavia' },
-  { brand: 'audi',       model: 'a4',       label: 'Audi A4' },
-  { brand: 'bmw',        model: 'serija-3', label: 'BMW Serija 3' },
-  { brand: 'mercedes-benz', model: 'c-klasa', label: 'Mercedes C' },
-  { brand: 'opel',       model: 'astra',    label: 'Opel Astra' },
-  { brand: 'ford',       model: 'focus',    label: 'Ford Focus' },
-  { brand: 'renault',    model: 'megane',   label: 'Renault Megane' },
-  { brand: 'nissan',     model: 'qashqai',  label: 'Nissan Qashqai' },
+  { brand: 'nissan',        model: 'qashqai',  label: 'Nissan Qashqai' },
+  { brand: 'volkswagen',    model: 'tiguan',   label: 'VW Tiguan' },
+  { brand: 'skoda',         model: 'kodiaq',   label: 'Skoda Kodiaq' },
+  { brand: 'hyundai',       model: 'tucson',   label: 'Hyundai Tucson' },
+  { brand: 'kia',           model: 'sportage', label: 'Kia Sportage' },
+  { brand: 'toyota',        model: 'rav4',     label: 'Toyota RAV4' },
+  { brand: 'mazda',         model: 'cx-5',     label: 'Mazda CX-5' },
+  { brand: 'ford',          model: 'kuga',     label: 'Ford Kuga' },
+  { brand: 'peugeot',       model: '3008',     label: 'Peugeot 3008' },
+  { brand: 'mercedes-benz', model: 'glc',      label: 'Mercedes GLC' },
 ];
 
 let browser = null;

@@ -498,64 +498,61 @@ function scoreListing(listing, allListings) {
 }
 
 function buildEmailHtml(deals) {
-  const rows = deals
+  const fuelLabel = { diesel: '⛽ Dizel', petrol: '⛽ Benzin', hybrid: '🔋 Hibrid', electric: '⚡ Struja' };
+  const transLabel = { automatic: '🔄 Automat', manual: '⚙️ Manuelni' };
+
+  const cards = deals
     .sort((a, b) => b.dealScore - a.dealScore)
-    .map(
-      (d) => `
-    <tr style="border-bottom: 1px solid #eee;">
-      <td style="padding: 12px 8px; width: 90px;">
-        ${d.image ? `<img src="${d.image}" style="width:80px;height:60px;object-fit:cover;border-radius:4px;" />` : '<div style="width:80px;height:60px;background:#eee;border-radius:4px;"></div>'}
-      </td>
-      <td style="padding: 12px 8px;">
-        <strong>${d.title}</strong><br>
-        <span style="font-size: 12px; color: #666;">
-          ${d.searchLabel} · ${d.year || '?'} · ${d.km ? d.km.toLocaleString('de-DE') + ' km' : '?'} · ${d.engine || '?'}
-          ${d.fuel ? `· <strong>${{diesel:'⛽ Dizel',petrol:'⛽ Benzin',hybrid:'🔋 Hibrid',electric:'⚡ Struja'}[d.fuel]}</strong>` : ''}
-          ${d.transmission ? `· ${{automatic:'🔄 Automat',manual:'⚙️ Manuelni'}[d.transmission]}` : ''}
-          ${d.notRegistered ? `· <span style="color:red;">⚠️ Nije registrovano</span>` : d.regMonths > 0 ? `· 📋 Reg. još ${d.regMonths} mes.` : ''}
-        </span>
-      </td>
-      <td style="padding: 12px 8px; text-align: center;">
-        <span style="background:${d.dealScore >= 80 ? '#00c853' : '#ff9100'};color:white;padding:4px 10px;border-radius:20px;font-weight:bold;">${d.dealScore}/100</span>
-      </td>
-      <td style="padding: 12px 8px; text-align: right;">
-        <strong>${d.price?.toLocaleString('de-DE')} €</strong><br>
-        ${d.marketAvg ? `<span style="font-size:12px;color:#999;">Median: ${d.marketAvg.toLocaleString('de-DE')} €</span>` : ''}
-      </td>
-      <td style="padding: 12px 8px; text-align: center; color: #00c853;">
-        ${d.savings > 0 ? `▼ ${d.savings.toLocaleString('de-DE')} €` : ''}
-      </td>
-      <td style="padding: 12px 8px; font-size: 12px; color: #555;">${d.reason}</td>
-      <td style="padding: 12px 8px; text-align: center;">
-        ${d.link ? `<a href="${d.link}" style="color:#0066cc;">Pogledaj →</a>` : '-'}
-      </td>
-    </tr>`
-    )
+    .map((d) => {
+      const scoreColor = d.dealScore >= 95 ? '#00c853' : d.dealScore >= 85 ? '#ff9100' : '#f44336';
+      const tags = [
+        d.fuel ? `<span style="background:#f0f0f0;border-radius:4px;padding:2px 6px;font-size:12px;">${fuelLabel[d.fuel] || d.fuel}</span>` : '',
+        d.transmission ? `<span style="background:#f0f0f0;border-radius:4px;padding:2px 6px;font-size:12px;">${transLabel[d.transmission] || d.transmission}</span>` : '',
+        d.notRegistered ? `<span style="background:#fff3e0;color:#e65100;border-radius:4px;padding:2px 6px;font-size:12px;">⚠️ Nije registrovano</span>` : d.regMonths > 0 ? `<span style="background:#e8f5e9;color:#2e7d32;border-radius:4px;padding:2px 6px;font-size:12px;">📋 Reg. još ${d.regMonths} mes.</span>` : '',
+      ].filter(Boolean).join(' ');
+
+      return `
+<div style="background:white;border-radius:12px;margin-bottom:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+  ${d.image ? `<img src="${d.image}" style="width:100%;height:200px;object-fit:cover;display:block;" />` : ''}
+  <div style="padding:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
+      <div style="font-size:16px;font-weight:bold;color:#1a1a2e;line-height:1.3;">${d.title}</div>
+      <div style="flex-shrink:0;background:${scoreColor};color:white;border-radius:20px;padding:4px 12px;font-weight:bold;font-size:15px;white-space:nowrap;">${d.dealScore}/100</div>
+    </div>
+    <div style="font-size:13px;color:#666;margin-bottom:8px;">
+      ${d.searchLabel} · ${d.year || '?'} · ${d.km ? d.km.toLocaleString('de-DE') + ' km' : '?'} · ${d.engine || '?'}
+    </div>
+    ${tags ? `<div style="margin-bottom:10px;">${tags}</div>` : ''}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div>
+        <div style="font-size:22px;font-weight:bold;color:#1a1a2e;">${d.price?.toLocaleString('de-DE')} €</div>
+        ${d.marketAvg ? `<div style="font-size:12px;color:#999;">Median: ${d.marketAvg.toLocaleString('de-DE')} €</div>` : ''}
+      </div>
+      ${d.savings > 0 ? `<div style="text-align:right;"><div style="font-size:18px;font-weight:bold;color:#00c853;">▼ ${d.savings.toLocaleString('de-DE')} €</div><div style="font-size:11px;color:#999;">uštedina</div></div>` : ''}
+    </div>
+    <div style="font-size:12px;color:#555;background:#f8f8f8;border-radius:6px;padding:10px;margin-bottom:12px;line-height:1.5;">${d.reason}</div>
+    ${d.link ? `<a href="${d.link}" style="display:block;text-align:center;background:#0066cc;color:white;text-decoration:none;border-radius:8px;padding:12px;font-weight:bold;font-size:15px;">Pogledaj oglas →</a>` : ''}
+  </div>
+</div>`;
+    })
     .join('');
 
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
-<body style="font-family:Arial,sans-serif;background:#f5f5f5;padding:20px;">
-  <div style="max-width:900px;margin:0 auto;background:white;border-radius:8px;overflow:hidden;">
-    <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);padding:24px 32px;">
-      <h1 style="margin:0;color:white;">Nova Top Ponuda!</h1>
-      <p style="margin:8px 0 0;color:#aaa;font-size:14px;">${deals.length} oglasa · score ≥ ${MIN_DEAL_SCORE} · ${new Date().toLocaleString('sr-RS')} · Real market data</p>
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background:#f0f2f5;font-family:Arial,sans-serif;">
+  <div style="max-width:600px;margin:0 auto;padding:16px;">
+    <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:12px;padding:24px;margin-bottom:16px;">
+      <h1 style="margin:0 0 6px;color:white;font-size:22px;">Nova Top Ponuda! 🚗</h1>
+      <p style="margin:0;color:#aaa;font-size:13px;">${deals.length} oglasa · score ≥ ${MIN_DEAL_SCORE} · ${new Date().toLocaleString('sr-RS')}</p>
     </div>
-    <div style="padding:24px 32px;">
-      <table style="width:100%;border-collapse:collapse;">
-        <thead><tr style="background:#f8f8f8;border-bottom:2px solid #ddd;">
-          <th style="padding:10px 8px;font-size:12px;color:#666;">SLIKA</th>
-          <th style="padding:10px 8px;text-align:left;font-size:12px;color:#666;">OGLAS</th>
-          <th style="padding:10px 8px;font-size:12px;color:#666;">SCORE</th>
-          <th style="padding:10px 8px;text-align:right;font-size:12px;color:#666;">CENA</th>
-          <th style="padding:10px 8px;font-size:12px;color:#666;">UŠTEDINA</th>
-          <th style="padding:10px 8px;font-size:12px;color:#666;">ANALIZA</th>
-          <th style="padding:10px 8px;font-size:12px;color:#666;">LINK</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
+    ${cards}
   </div>
-</body></html>`;
+</body>
+</html>`;
 }
 
 async function sendEmail(deals) {
@@ -597,8 +594,18 @@ async function main() {
   for (const search of SEARCHES) {
     console.log(`\nFetching 24h: ${search.label}`);
 
-    const newListings = await fetchListings(search, true);
-    console.log(`  Novi (24h): ${newListings.length}`);
+    const rawListings = await fetchListings(search, true);
+
+    // Deduplicate by ID — keep the entry with an image when there are duplicates
+    const dedupMap = new Map();
+    for (const l of rawListings) {
+      const existing = dedupMap.get(l.id);
+      if (!existing || (!existing.image && l.image)) {
+        dedupMap.set(l.id, l);
+      }
+    }
+    const newListings = Array.from(dedupMap.values());
+    console.log(`  Novi (24h): ${newListings.length} (raw: ${rawListings.length})`);
 
     if (newListings.length === 0) {
       await new Promise((r) => setTimeout(r, 1000));

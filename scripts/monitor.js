@@ -625,17 +625,23 @@ async function main() {
   const seen = loadSeen();
   const newDeals = [];
 
-  // Phase 1: fetch all pages for all 30 models in parallel (5 concurrent)
-  console.log('\n--- Phase 1: Fetching baseline listings for all models (parallel) ---');
+  // Phase 1: fetch baseline per model (parallel, concurrency=2)
+  console.log('\n--- Phase 1: Fetching baseline listings per model (parallel) ---');
   const baselineResults = await pMap(SEARCHES, async (search) => {
     const listings = await fetchBaseline(search);
     console.log(`  ${search.label}: ${listings.length} baseline listings`);
-    return listings;
+    return { key: `${search.brand}-${search.model}`, listings };
   }, 2);
-  const globalBaseline = baselineResults.flat();
-  console.log(`Global baseline pool: ${globalBaseline.length} listings across all models`);
 
-  // Phase 2: fetch 24h listings for all models in parallel (5 concurrent)
+  // Map: modelKey → baseline listings
+  const baselineByModel = {};
+  for (const { key, listings } of baselineResults) {
+    baselineByModel[key] = listings;
+  }
+  const totalBaseline = baselineResults.reduce((s, r) => s + r.listings.length, 0);
+  console.log(`Total baseline: ${totalBaseline} listings across ${SEARCHES.length} models`);
+
+  // Phase 2: fetch 24h listings per model, score against that model's own baseline
   console.log('\n--- Phase 2: Checking new listings (parallel) ---');
   const phase2Results = await pMap(SEARCHES, async (search) => {
     const rawListings = await fetchListings(search, true);
@@ -650,13 +656,16 @@ async function main() {
     }
     const newListings = Array.from(dedupMap.values());
     console.log(`  ${search.label}: ${newListings.length} novi (raw: ${rawListings.length})`);
-    return newListings;
+    return { search, newListings };
   }, 2);
 
-  for (const newListings of phase2Results) {
+  for (const { search, newListings } of phase2Results) {
     if (newListings.length === 0) continue;
 
-    const scoringPool = [...newListings, ...globalBaseline];
+    // Score against this model's own baseline only
+    const modelKey = `${search.brand}-${search.model}`;
+    const modelBaseline = baselineByModel[modelKey] || [];
+    const scoringPool = [...newListings, ...modelBaseline];
 
     const toScore = newListings.filter((l) => {
       const prev = seen[l.id];

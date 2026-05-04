@@ -1,5 +1,7 @@
 name: cars-monitor
 on:
+  push:
+    branches: [main]
   schedule:
     - cron: '30 5-20 * * *' # every hour at :30, 07:30–22:30 Belgrade (UTC+2)
   workflow_dispatch:

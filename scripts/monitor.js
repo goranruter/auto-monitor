@@ -208,7 +208,9 @@ async function fetchListingsFromPage(url, search) {
         if (!el || seen.has(el)) continue;
         seen.add(el);
 
-        const text = el.innerText || '';
+        // Strip injected promotional boilerplate before parsing data
+        const rawText = el.innerText || '';
+        const text = rawText.replace(/automatska klima[\s\S]*?kožna sedi[šs]ta/gi, '').trim();
 
         // Title: first line only (avoids bleed-in of promo text)
         const heading = el.querySelector('h2, h3, h4, [class*="title"], [class*="naziv"]');

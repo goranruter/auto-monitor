@@ -224,8 +224,10 @@ async function fetchListingsFromPage(url, search) {
           if (!keywords.some(kw => titleLower.includes(kw.toLowerCase()))) continue;
         }
 
-        // Link
-        const href = link.href || '';
+        // Link — prefer a direct listing URL with numeric ID (/auto-oglasi/12345/slug)
+        const allLinks = Array.from(el.querySelectorAll('a[href*="/auto-oglasi/"]'));
+        const directLink = allLinks.find(a => /\/auto-oglasi\/\d+\//.test(a.href)) || link;
+        const href = directLink.href || '';
 
         // Image
         const img = el.querySelector('img');

@@ -175,14 +175,22 @@ async function fetchListingsFromPage(url, search) {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(2000);
 
+    // Debug: print page title and link count to diagnose blocks/structure changes
+    const pageTitle = await page.title();
+    const adLinkCount = await page.evaluate(() =>
+      document.querySelectorAll('a[href*="/auto-oglasi/"]').length
+    );
+    if (adLinkCount === 0) {
+      console.log(`  [DEBUG] title="${pageTitle}" | ad-links=0 | url=${url.slice(0, 80)}`);
+    }
+
     const results = await page.evaluate((params) => {
       const { brand, model, label, keywords, MIN_PRICE, MAX_PRICE, MIN_YEAR } = params;
       const listings = [];
 
       // Find all links pointing to individual ad pages
-      // Link must end with a numeric ID (e.g. /auto-oglasi/volkswagen/golf/123456)
       const adLinks = Array.from(document.querySelectorAll('a[href*="/auto-oglasi/"]'))
-        .filter(a => /\/auto-oglasi\/[^/]+\/[^/]+\/\d+/.test(a.href));
+        .filter(a => /\/auto-oglasi\/[^/]+\/[^/]+/.test(a.href) && !a.href.includes('pretraga') && !a.href.includes('poslednja'));
 
       // Get unique article containers
       const seen = new Set();
@@ -200,14 +208,9 @@ async function fetchListingsFromPage(url, search) {
         if (!el || seen.has(el)) continue;
         seen.add(el);
 
-        // Skip promoted/sponsored/featured containers
-        const elClass = (el.className || '').toLowerCase();
-        const elHtml = el.outerHTML?.slice(0, 300).toLowerCase() || '';
-        if (/promot|sponsor|featured|top-oglas|istaknuto|premium/.test(elClass + elHtml)) continue;
-
         const text = el.innerText || '';
 
-        // Title: first line only from heading (avoid bleed-in of promo text)
+        // Title: first line only (avoids bleed-in of promo text)
         const heading = el.querySelector('h2, h3, h4, [class*="title"], [class*="naziv"]');
         const rawTitle = heading?.innerText?.trim() || link.innerText?.trim() || '';
         const title = rawTitle.split('\n')[0].trim();
@@ -219,9 +222,8 @@ async function fetchListingsFromPage(url, search) {
           if (!keywords.some(kw => titleLower.includes(kw.toLowerCase()))) continue;
         }
 
-        // Link — must be a direct listing URL with numeric ID
+        // Link
         const href = link.href || '';
-        if (!/\/\d+$/.test(href.replace(/\/$/, ''))) continue;
 
         // Image
         const img = el.querySelector('img');

@@ -64,6 +64,58 @@ const SEARCHES_CARS = [
 
 const SEARCHES = MONITOR_TYPE === 'cars' ? SEARCHES_CARS : SEARCHES_SUV;
 
+// Generation ranges per model — used to ensure fair price comparison within same generation
+const GENERATIONS = {
+  'volkswagen-golf':        [{from:2013,to:2019,gen:'7'},{from:2020,to:9999,gen:'8'}],
+  'volkswagen-passat':      [{from:2015,to:9999,gen:'B8'},{from:2011,to:2014,gen:'B7'}],
+  'volkswagen-tiguan':      [{from:2016,to:9999,gen:'2'},{from:2007,to:2015,gen:'1'}],
+  'volkswagen-touareg':     [{from:2018,to:9999,gen:'3'},{from:2010,to:2017,gen:'2'}],
+  'skoda-octavia':          [{from:2020,to:9999,gen:'4'},{from:2013,to:2019,gen:'3'}],
+  'skoda-superb':           [{from:2015,to:9999,gen:'3'}],
+  'skoda-kodiaq':           [{from:2017,to:9999,gen:'1'}],
+  'seat-leon':              [{from:2020,to:9999,gen:'4'},{from:2013,to:2019,gen:'3'}],
+  'audi-a4':                [{from:2016,to:9999,gen:'B9'},{from:2008,to:2015,gen:'B8'}],
+  'audi-a6':                [{from:2018,to:9999,gen:'C8'},{from:2011,to:2017,gen:'C7'}],
+  'audi-q3':                [{from:2019,to:9999,gen:'2'},{from:2011,to:2018,gen:'1'}],
+  'audi-q5':                [{from:2017,to:9999,gen:'2'},{from:2008,to:2016,gen:'1'}],
+  'bmw-serija-3':           [{from:2019,to:9999,gen:'G20'},{from:2012,to:2018,gen:'F30'}],
+  'bmw-serija-5':           [{from:2017,to:9999,gen:'G30'},{from:2010,to:2016,gen:'F10'}],
+  'bmw-x1':                 [{from:2015,to:2021,gen:'F48'},{from:2022,to:9999,gen:'U11'}],
+  'bmw-x3':                 [{from:2018,to:9999,gen:'G01'},{from:2011,to:2017,gen:'F25'}],
+  'mercedes-benz-c-klasa':  [{from:2014,to:9999,gen:'W205'},{from:2007,to:2013,gen:'W204'}],
+  'mercedes-benz-e-klasa':  [{from:2016,to:9999,gen:'W213'},{from:2009,to:2015,gen:'W212'}],
+  'mercedes-benz-glc':      [{from:2016,to:2022,gen:'X253'},{from:2022,to:9999,gen:'X254'}],
+  'opel-astra':             [{from:2016,to:2021,gen:'K'},{from:2010,to:2015,gen:'J'},{from:2022,to:9999,gen:'L'}],
+  'opel-insignia':          [{from:2017,to:9999,gen:'B'},{from:2009,to:2016,gen:'A'}],
+  'ford-focus':             [{from:2018,to:9999,gen:'4'},{from:2011,to:2017,gen:'3'}],
+  'ford-mondeo':            [{from:2015,to:9999,gen:'5'}],
+  'ford-kuga':              [{from:2020,to:9999,gen:'3'},{from:2013,to:2019,gen:'2'}],
+  'renault-megane':         [{from:2016,to:9999,gen:'4'},{from:2008,to:2015,gen:'3'}],
+  'renault-kadjar':         [{from:2015,to:2022,gen:'1'}],
+  'peugeot-308':            [{from:2021,to:9999,gen:'3'},{from:2013,to:2020,gen:'2'}],
+  'peugeot-3008':           [{from:2016,to:9999,gen:'2'},{from:2009,to:2015,gen:'1'}],
+  'toyota-auris':           [{from:2013,to:2018,gen:'2'}],
+  'toyota-rav4':            [{from:2019,to:9999,gen:'5'},{from:2013,to:2018,gen:'4'}],
+  'hyundai-i30':            [{from:2017,to:9999,gen:'3'},{from:2012,to:2016,gen:'2'}],
+  'hyundai-tucson':         [{from:2021,to:9999,gen:'4'},{from:2015,to:2020,gen:'3'}],
+  'hyundai-ix35':           [{from:2009,to:2015,gen:'1'}],
+  'kia-ceed':               [{from:2018,to:9999,gen:'3'},{from:2012,to:2017,gen:'2'}],
+  'kia-sportage':           [{from:2022,to:9999,gen:'5'},{from:2016,to:2021,gen:'4'}],
+  'nissan-qashqai':         [{from:2021,to:9999,gen:'3'},{from:2014,to:2020,gen:'2'}],
+  'mazda-cx-5':             [{from:2017,to:9999,gen:'2'},{from:2012,to:2016,gen:'1'}],
+  'jeep-compass':           [{from:2017,to:9999,gen:'2'}],
+  'mitsubishi-outlander':   [{from:2021,to:9999,gen:'4'},{from:2012,to:2020,gen:'3'}],
+  'honda-cr-v':             [{from:2017,to:9999,gen:'5'},{from:2012,to:2016,gen:'4'}],
+};
+
+function getGeneration(brand, model, year) {
+  if (!year) return null;
+  const gens = GENERATIONS[`${brand}-${model}`];
+  if (!gens) return null;
+  const found = gens.find(g => year >= g.from && year <= g.to);
+  return found ? found.gen : null;
+}
+
 let browser = null;
 let browserContext = null;
 
@@ -308,7 +360,7 @@ async function fetchListingsFromPage(url, search) {
           : Math.round(regMonths * monthlyRate);
 
         const id = `${brand}-${model}-${price}-${km || 0}-${year || 0}`;
-        listings.push({ id, title, price, year, km, engine, engineCC, location, link: href, image, fuel, transmission, regMonths, notRegistered, annualRegCostEur, regBonus, searchLabel: label });
+        listings.push({ id, title, price, year, km, engine, engineCC, location, link: href, image, fuel, transmission, regMonths, notRegistered, annualRegCostEur, regBonus, searchLabel: label, brand, model });
       }
 
       return listings;
@@ -468,36 +520,54 @@ function scoreListing(listing, allListings) {
   const km = listing.km || 0;
   const fuel = listing.fuel;
   const transmission = listing.transmission;
+  const generation = getGeneration(listing.brand, listing.model, year);
   const others = allListings.filter((l) => l.id !== listing.id && l.price >= MIN_PRICE);
 
+  const genOk  = (l) => {
+    if (!generation) return true;
+    const lg = getGeneration(l.brand, l.model, l.year);
+    return !lg || lg === generation;
+  };
   const yearOk = (l) => !year || !l.year || Math.abs(l.year - year) <= 2;
-  const kmOk = (l) => !km || !l.km || (l.km >= km * 0.6 && l.km <= km * 1.4);
+  const kmOk   = (l) => !km || !l.km || (l.km >= km * 0.6 && l.km <= km * 1.4);
   const fuelOk = (l) => !fuel || !l.fuel || l.fuel === fuel;
-  const transOk = (l) => !transmission || !l.transmission || l.transmission === transmission;
+  const transOk= (l) => !transmission || !l.transmission || l.transmission === transmission;
 
-  // 1. Best: year ±2, km ±40%, same fuel, same transmission
-  let pool = others.filter((l) => yearOk(l) && kmOk(l) && fuelOk(l) && transOk(l));
-  let poolDesc = `${pool.length} oglasa (god, km, gorivo, menjač)`;
+  // 1. Best: same generation, km ±40%, same fuel, same transmission
+  let pool = others.filter((l) => genOk(l) && kmOk(l) && fuelOk(l) && transOk(l));
+  let poolDesc = `${pool.length} oglasa (gen${generation ? ' '+generation : ''}, km, gorivo, menjač)`;
 
-  // 2. Drop transmission filter
+  // 2. Drop transmission
   if (pool.length < 4) {
-    pool = others.filter((l) => yearOk(l) && kmOk(l) && fuelOk(l));
-    poolDesc = `${pool.length} oglasa (god, km, gorivo)`;
+    pool = others.filter((l) => genOk(l) && kmOk(l) && fuelOk(l));
+    poolDesc = `${pool.length} oglasa (gen${generation ? ' '+generation : ''}, km, gorivo)`;
   }
 
-  // 3. Drop fuel filter
+  // 3. Drop fuel
+  if (pool.length < 4) {
+    pool = others.filter((l) => genOk(l) && kmOk(l));
+    poolDesc = `${pool.length} oglasa (gen${generation ? ' '+generation : ''}, slična km)`;
+  }
+
+  // 4. Same generation only (drop km)
+  if (pool.length < 4) {
+    pool = others.filter((l) => genOk(l));
+    poolDesc = `${pool.length} oglasa (gen${generation ? ' '+generation : ''})`;
+  }
+
+  // 5. Year ±2 fallback (ignore generation)
   if (pool.length < 4) {
     pool = others.filter((l) => yearOk(l) && kmOk(l));
     poolDesc = `${pool.length} oglasa (god ±2, slična km)`;
   }
 
-  // 4. Widen year
+  // 6. Year ±3
   if (pool.length < 4) {
     pool = others.filter((l) => !year || !l.year || Math.abs(l.year - year) <= 3);
     poolDesc = `${pool.length} oglasa (god ±3)`;
   }
 
-  // 5. All
+  // 7. All
   if (pool.length < 3) {
     pool = others;
     poolDesc = `${pool.length} oglasa modela`;

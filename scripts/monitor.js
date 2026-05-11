@@ -8,7 +8,7 @@ const GMAIL_USER = process.env.GMAIL_USER;
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 const MIN_DEAL_SCORE = parseInt(process.env.MIN_DEAL_SCORE || '80');
 const MIN_PRICE = parseInt(process.env.MIN_PRICE || '8000');
-const MAX_PRICE = parseInt(process.env.MAX_PRICE || '12000');
+const MAX_PRICE = parseInt(process.env.MAX_PRICE || '15000');
 const MIN_YEAR = parseInt(process.env.MIN_YEAR || '2014');
 
 // MONITOR_TYPE: 'suv' (default) or 'cars'

@@ -574,16 +574,45 @@ function scoreListing(listing, allListings) {
   }
 
   if (pool.length === 0) {
-    return { dealScore: 50, marketAvg: null, savings: 0, reason: 'Nedovoljno podataka.' };
+    return { dealScore: 50, priceRating: 'N/A', marketAvg: null, savings: 0, reason: 'Nedovoljno podataka.' };
   }
 
-  const median = calcMedian(pool.map((l) => l.price));
+  // --- Mileage-normalized median (mobile.de approach) ---
+  // Estimate depreciation per km from pool: fit linear regression price ~ km
+  // then shift each pool car's price to the target km before computing median
+  let normalizedPrices = pool.map(l => l.price); // fallback: raw prices
+  if (km > 0 && pool.filter(l => l.km > 0).length >= 4) {
+    const pts = pool.filter(l => l.km > 0 && l.price > 0);
+    const n = pts.length;
+    const sumX = pts.reduce((s, l) => s + l.km, 0);
+    const sumY = pts.reduce((s, l) => s + l.price, 0);
+    const sumXY = pts.reduce((s, l) => s + l.km * l.price, 0);
+    const sumX2 = pts.reduce((s, l) => s + l.km * l.km, 0);
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX); // €/km (negative = depreciation)
+    if (slope < 0) {
+      // Shift each car's price to what it would cost at the target mileage
+      normalizedPrices = pool.map(l => {
+        if (!l.km) return l.price;
+        return Math.round(l.price + slope * (km - l.km)); // adjust to target km
+      }).filter(p => p > 0);
+    }
+  }
+
+  const median = calcMedian(normalizedPrices.length >= 3 ? normalizedPrices : pool.map(l => l.price));
 
   // Effective price adjusts for included registration value
   const regBonus = listing.regBonus || 0;
   const effectivePrice = listing.price - regBonus;
   const savings = median - effectivePrice;
   const deviationPct = savings / median;
+
+  // 5-tier price rating (mobile.de style)
+  let priceRating;
+  if (deviationPct >= 0.20)       priceRating = '🟢 Odlična cena';
+  else if (deviationPct >= 0.10)  priceRating = '🟡 Dobra cena';
+  else if (deviationPct >= -0.10) priceRating = '⚪ Fer cena';
+  else if (deviationPct >= -0.20) priceRating = '🔴 Visoka cena';
+  else                             priceRating = '🔴 Previsoka cena';
 
   const dealScore = Math.min(100, Math.max(0, Math.round(50 + deviationPct * 250)));
 
@@ -601,7 +630,7 @@ function scoreListing(listing, allListings) {
     `${direction} medijana (${median.toLocaleString('de-DE')}€) ` +
     `na osnovu ${poolDesc}${extras ? ` [${extras}]` : ''}.`;
 
-  return { dealScore, marketAvg: median, savings: Math.round(savings), reason };
+  return { dealScore, priceRating, marketAvg: median, savings: Math.round(savings), reason };
 }
 
 function buildEmailHtml(deals) {
@@ -612,6 +641,8 @@ function buildEmailHtml(deals) {
     .sort((a, b) => b.dealScore - a.dealScore)
     .map((d) => {
       const scoreColor = d.dealScore >= 95 ? '#00c853' : d.dealScore >= 85 ? '#ff9100' : '#f44336';
+      const ratingBg = d.priceRating?.startsWith('🟢') ? '#e8f5e9' : d.priceRating?.startsWith('🟡') ? '#fffde7' : d.priceRating?.startsWith('⚪') ? '#f5f5f5' : '#fce4ec';
+      const ratingColor = d.priceRating?.startsWith('🟢') ? '#2e7d32' : d.priceRating?.startsWith('🟡') ? '#f57f17' : d.priceRating?.startsWith('⚪') ? '#555' : '#c62828';
       const tags = [
         d.fuel ? `<span style="background:#f0f0f0;border-radius:4px;padding:2px 6px;font-size:12px;">${fuelLabel[d.fuel] || d.fuel}</span>` : '',
         d.transmission ? `<span style="background:#f0f0f0;border-radius:4px;padding:2px 6px;font-size:12px;">${transLabel[d.transmission] || d.transmission}</span>` : '',
@@ -626,6 +657,7 @@ function buildEmailHtml(deals) {
       <div style="font-size:16px;font-weight:bold;color:#1a1a2e;line-height:1.3;">${d.title}</div>
       <div style="flex-shrink:0;background:${scoreColor};color:white;border-radius:20px;padding:4px 12px;font-weight:bold;font-size:15px;white-space:nowrap;">${d.dealScore}/100</div>
     </div>
+    ${d.priceRating ? `<div style="display:inline-block;background:${ratingBg};color:${ratingColor};border-radius:6px;padding:4px 10px;font-size:13px;font-weight:bold;margin-bottom:8px;">${d.priceRating}</div>` : ''}
     <div style="font-size:13px;color:#666;margin-bottom:8px;">
       ${d.searchLabel} · ${d.year || '?'} · ${d.km ? d.km.toLocaleString('de-DE') + ' km' : '?'} · ${d.engine || '?'}
     </div>

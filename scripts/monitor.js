@@ -910,7 +910,7 @@ async function main() {
       const scored = scoreListing(listing, scoringPool);
       console.log(`    ${listing.title}: score=${scored.dealScore}, cena=${listing.price}€, median=${scored.marketAvg}€`);
       if (scored.dealScore >= MIN_DEAL_SCORE) {
-        newDeals.push({ ...listing, ...scored });
+        newDeals.push({ ...listing, ...scored, url: listing.link });
       }
     }
 

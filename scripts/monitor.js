@@ -312,7 +312,7 @@ async function fetchPage(url) {
     try {
       page = await browserContext.newPage();
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await page.waitForTimeout(2000);
+      await page.waitForSelector('a[href*="/auto-oglasi/"]', { timeout: 3000 }).catch(() => {});
       return await page.content();
     } catch (err) {
       if (isBrowserCrash(err) && attempt === 1) {
@@ -333,7 +333,9 @@ async function fetchListingsFromPage(url, search) {
   try {
     page = await browserContext.newPage();
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForTimeout(2000);
+    // Wait for listing links to appear — proceed as soon as they're in DOM,
+    // fall back to 3s max (much faster than a fixed 2s sleep on loaded pages)
+    await page.waitForSelector('a[href*="/auto-oglasi/"]', { timeout: 3000 }).catch(() => {});
 
     // Debug: print page title and link count to diagnose blocks/structure changes
     const pageTitle = await page.title();
@@ -923,6 +925,7 @@ async function main() {
   // Phase 2: fetch 24h listings per model, score against that model's own baseline
   console.log('\n--- Phase 2: Checking new listings (parallel) ---');
   const phase2Results = await pMap(ACTIVE_SEARCHES, async (search) => {
+
     let rawListings = await fetchListings(search, true);
     // Retry once on empty result
     if (rawListings.length === 0) {
@@ -942,7 +945,7 @@ async function main() {
     const newListings = Array.from(dedupMap.values());
     console.log(`  ${search.label}: ${newListings.length} novi (raw: ${rawListings.length})`);
     return { search, newListings };
-  }, 2);
+  }, 6);
 
   for (const { search, newListings } of phase2Results) {
     if (newListings.length === 0) continue;

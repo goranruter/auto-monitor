@@ -408,7 +408,7 @@ function renderResults(data) {
       ${saving?`<div class="saving">${saving}</div>`:''}
     </div>
     ${chips.length||d.hasAccident?`<div class="equip-row">${chips.map(c=>`<span class="ec">${c}</span>`).join('')}${d.hasAccident?'<span class="ec dmg">⚠ Havarisano</span>':''}</div>`:''}
-    <a class="deal-link" href="${d.url}" target="_blank" rel="noopener">Pogledaj oglas →</a>
+    <a class="deal-link" href="${d.url || d.link || '#'}" target="_blank" rel="noopener">Pogledaj oglas →</a>
   </div>
 </div>`;
   }).join('');

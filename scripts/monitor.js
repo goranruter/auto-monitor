@@ -395,9 +395,15 @@ async function fetchListingsFromPage(url, search) {
         const img = el.querySelector('img');
         const image = img?.src || img?.dataset?.src || img?.getAttribute('data-lazy-src') || null;
 
-        // Price: find € in text
-        const priceMatch = text.match(/([\d\.\s]+)\s*€/);
-        const price = priceMatch ? parseInt(priceMatch[1].replace(/[^\d]/g, '')) : null;
+        // Price — match properly-formatted number directly before €
+        // Use [\d.]+ (NO \s) so it can't cross newlines and concatenate km+price
+        // e.g. "65.000 km\n18.990 €" must NOT produce 6500018990
+        const priceMatches = [...text.matchAll(/\b(\d{1,3}(?:\.\d{3})*|\d+)\s*€/g)];
+        const rawPrice = priceMatches.length
+          ? parseInt(priceMatches[priceMatches.length - 1][1].replace(/\./g, ''))
+          : null;
+        // Sanity cap: real cars don't cost more than 500 000 €
+        const price = (rawPrice && rawPrice <= 500000) ? rawPrice : null;
         if (!price) continue;
         if (MIN_PRICE && price < MIN_PRICE) continue;
         if (MAX_PRICE && price > MAX_PRICE) continue;
@@ -691,48 +697,54 @@ function scoreListing(listing, allListings) {
     if (year && l.year) return Math.abs(l.year - year) <= 4;
     return true;
   };
-  const yearOk = (l) => !year || !l.year || Math.abs(l.year - year) <= 2;
-  const kmOk   = (l) => !km || !l.km || (l.km >= km * 0.6 && l.km <= km * 1.4);
-  const fuelOk = (l) => !fuel || !l.fuel || l.fuel === fuel;
-  const transOk= (l) => !transmission || !l.transmission || l.transmission === transmission;
+  const yearOk  = (l) => !year || !l.year || Math.abs(l.year - year) <= 2;
+  const kmOk    = (l) => !km || !l.km || (l.km >= km * 0.6 && l.km <= km * 1.4);
+  const fuelOk  = (l) => !fuel || !l.fuel || l.fuel === fuel;
+  const transOk = (l) => !transmission || !l.transmission || l.transmission === transmission;
+  // Sanity: exclude listings with clearly corrupted prices from pool
+  // (anything over 500k is a parsing error — keeps regression from exploding)
+  const priceOk = (l) => l.price > 0 && l.price <= 500000;
+
+  // Always require priceOk so corrupted baseline prices never enter the pool
+  const base = others.filter(priceOk);
 
   // 1. Best: same generation, km ±40%, same fuel, same transmission
-  let pool = others.filter((l) => genOk(l) && kmOk(l) && fuelOk(l) && transOk(l));
+  let pool = base.filter((l) => genOk(l) && kmOk(l) && fuelOk(l) && transOk(l));
   let poolDesc = `${pool.length} oglasa (gen${generation ? ' '+generation : ''}, km, gorivo, menjač)`;
 
   // 2. Drop transmission
   if (pool.length < 4) {
-    pool = others.filter((l) => genOk(l) && kmOk(l) && fuelOk(l));
+    pool = base.filter((l) => genOk(l) && kmOk(l) && fuelOk(l));
     poolDesc = `${pool.length} oglasa (gen${generation ? ' '+generation : ''}, km, gorivo)`;
   }
 
   // 3. Drop fuel
   if (pool.length < 4) {
-    pool = others.filter((l) => genOk(l) && kmOk(l));
+    pool = base.filter((l) => genOk(l) && kmOk(l));
     poolDesc = `${pool.length} oglasa (gen${generation ? ' '+generation : ''}, slična km)`;
   }
 
   // 4. Same generation only (drop km)
   if (pool.length < 4) {
-    pool = others.filter((l) => genOk(l));
+    pool = base.filter((l) => genOk(l));
     poolDesc = `${pool.length} oglasa (gen${generation ? ' '+generation : ''})`;
   }
 
   // 5. Year ±2 fallback (ignore generation)
   if (pool.length < 4) {
-    pool = others.filter((l) => yearOk(l) && kmOk(l));
+    pool = base.filter((l) => yearOk(l) && kmOk(l));
     poolDesc = `${pool.length} oglasa (god ±2, slična km)`;
   }
 
   // 6. Year ±3
   if (pool.length < 4) {
-    pool = others.filter((l) => !year || !l.year || Math.abs(l.year - year) <= 3);
+    pool = base.filter((l) => !year || !l.year || Math.abs(l.year - year) <= 3);
     poolDesc = `${pool.length} oglasa (god ±3)`;
   }
 
-  // 7. All
+  // 7. All (still priceOk-filtered)
   if (pool.length < 3) {
-    pool = others;
+    pool = base;
     poolDesc = `${pool.length} oglasa modela`;
   }
 
@@ -762,6 +774,12 @@ function scoreListing(listing, allListings) {
   }
 
   const median = calcMedian(normalizedPrices.length >= 3 ? normalizedPrices : pool.map(l => l.price));
+
+  // Sanity check: median must be plausible relative to the listing's own price.
+  // If median is >10× or <0.1× the listing price, the pool data is too noisy to trust.
+  if (!median || median > 500000 || median < 100 || median > listing.price * 10 || median < listing.price * 0.1) {
+    return { dealScore: 50, priceRating: 'N/A', marketAvg: null, savings: 0, reason: 'Nedovoljno pouzdanih podataka za poređenje.' };
+  }
 
   // Effective price = listed price adjusted for reg, equipment value, and damage
   const regBonus = listing.regBonus || 0;
@@ -981,23 +999,37 @@ async function main() {
   }
   saveSeen(seen);
 
-  console.log(`\nTotal top deals found: ${newDeals.length}`);
+  // Dedup across models — same physical listing can appear in multiple model
+  // searches (e.g. Mercedes B 200 showing in b-klasa AND a-klasa results).
+  // Deduplicate by URL (link), keeping the highest-scored copy.
+  const dedupedDeals = [];
+  const seenLinks = new Map();
+  for (const deal of newDeals) {
+    const key = deal.link || deal.url || deal.id;
+    const existing = seenLinks.get(key);
+    if (!existing || (deal.dealScore || 0) > (existing.dealScore || 0)) {
+      seenLinks.set(key, deal);
+    }
+  }
+  dedupedDeals.push(...seenLinks.values());
+
+  console.log(`\nTotal top deals found: ${dedupedDeals.length} (${newDeals.length} before dedup)`);
 
   // Save results for GUI
   saveResults({
     timestamp: new Date().toISOString(),
-    deals: newDeals,
+    deals: dedupedDeals,
     modelsChecked: SEARCHES.length,
     totalBaselineListings: totalBaseline,
     minScore: MIN_DEAL_SCORE,
     priceRange: { min: MIN_PRICE, max: MAX_PRICE },
   });
 
-  if (newDeals.length > 0) {
+  if (dedupedDeals.length > 0) {
     if (GMAIL_USER && GMAIL_APP_PASSWORD) {
-      await sendEmail(newDeals);
+      await sendEmail(dedupedDeals);
     } else {
-      console.log(`Pronađeno ${newDeals.length} deal(a) — email preskočen (GMAIL_USER/GMAIL_APP_PASSWORD nisu postavljeni).`);
+      console.log(`Pronađeno ${dedupedDeals.length} deal(a) — email preskočen (GMAIL_USER/GMAIL_APP_PASSWORD nisu postavljeni).`);
     }
   } else {
     console.log('Nema novih top ponuda, email se ne šalje.');

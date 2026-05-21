@@ -52,6 +52,12 @@ app.get('/api/config', (req, res) => {
 });
 
 // SSE endpoint — streams live logs while monitor runs
+// Query params (all optional):
+//   models    — comma-separated "brand-model" keys, e.g. "volkswagen-golf,skoda-octavia"
+//   minPrice  — override MIN_PRICE
+//   maxPrice  — override MAX_PRICE
+//   minYear   — override MIN_YEAR
+//   minScore  — override MIN_DEAL_SCORE
 app.get('/api/run', (req, res) => {
   if (isRunning) {
     res.status(409).json({ error: 'Already running' });
@@ -73,9 +79,17 @@ app.get('/api/run', (req, res) => {
 
   send('start', '=== Monitor Starting ===');
 
+  // Build env — start from .env file then overlay query params
+  const env = loadEnv();
+  if (req.query.minPrice)  env.MIN_PRICE      = req.query.minPrice;
+  if (req.query.maxPrice)  env.MAX_PRICE      = req.query.maxPrice;
+  if (req.query.minYear)   env.MIN_YEAR       = req.query.minYear;
+  if (req.query.minScore)  env.MIN_DEAL_SCORE = req.query.minScore;
+  if (req.query.models)    env.MONITOR_MODELS = req.query.models;
+
   currentProcess = spawn('node', ['scripts/monitor.js'], {
     cwd: __dirname,
-    env: loadEnv(),
+    env,
   });
 
   currentProcess.stdout.on('data', (data) => {

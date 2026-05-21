@@ -67,6 +67,12 @@ const SEARCHES_CARS = [
 
 const SEARCHES = [...SEARCHES_SUV, ...SEARCHES_CARS];
 
+// If MONITOR_MODELS env is set (comma-separated "brand-model" keys), run only those
+const MONITOR_MODELS_ENV = process.env.MONITOR_MODELS;
+const ACTIVE_SEARCHES = MONITOR_MODELS_ENV
+  ? SEARCHES.filter(s => MONITOR_MODELS_ENV.split(',').includes(`${s.brand}-${s.model}`))
+  : SEARCHES;
+
 // Generation ranges per model — used to ensure fair price comparison within same generation
 const GENERATIONS = {
   'volkswagen-golf':        [{from:2013,to:2019,gen:'7'},{from:2020,to:9999,gen:'8'}],
@@ -768,7 +774,7 @@ async function pMap(items, fn, concurrency = 5) {
 
 async function main() {
   console.log(`\n=== Auto Monitor Start: ${new Date().toISOString()} ===`);
-  console.log(`Min price: ${MIN_PRICE}€ | Min deal score: ${MIN_DEAL_SCORE} | Searches: ${SEARCHES.length}`);
+  console.log(`Min price: ${MIN_PRICE}€ | Max price: ${MAX_PRICE}€ | Min year: ${MIN_YEAR} | Min deal score: ${MIN_DEAL_SCORE} | Searches: ${ACTIVE_SEARCHES.length}`);
 
   await initBrowser();
 
@@ -780,7 +786,7 @@ async function main() {
   let baselineByModel = loadBaselineCache();
   let totalBaseline = 0;
   if (!baselineByModel) {
-    const baselineResults = await pMap(SEARCHES, async (search) => {
+    const baselineResults = await pMap(ACTIVE_SEARCHES, async (search) => {
       const listings = await fetchBaseline(search);
       console.log(`  ${search.label}: ${listings.length} baseline listings`);
       return { key: `${search.brand}-${search.model}`, listings };
@@ -792,11 +798,11 @@ async function main() {
     saveBaselineCache(baselineByModel);
   }
   totalBaseline = Object.values(baselineByModel).reduce((s, l) => s + l.length, 0);
-  console.log(`Baseline pool: ${totalBaseline} listings across ${SEARCHES.length} models`);
+  console.log(`Baseline pool: ${totalBaseline} listings across ${ACTIVE_SEARCHES.length} models`);
 
   // Phase 2: fetch 24h listings per model, score against that model's own baseline
   console.log('\n--- Phase 2: Checking new listings (parallel) ---');
-  const phase2Results = await pMap(SEARCHES, async (search) => {
+  const phase2Results = await pMap(ACTIVE_SEARCHES, async (search) => {
     let rawListings = await fetchListings(search, true);
     // Retry once on empty result
     if (rawListings.length === 0) {

@@ -395,15 +395,23 @@ async function fetchListingsFromPage(url, search) {
         const img = el.querySelector('img');
         const image = img?.src || img?.dataset?.src || img?.getAttribute('data-lazy-src') || null;
 
-        // Price — match properly-formatted number directly before €
-        // Use [\d.]+ (NO \s) so it can't cross newlines and concatenate km+price
-        // e.g. "65.000 km\n18.990 €" must NOT produce 6500018990
-        const priceMatches = [...text.matchAll(/\b(\d{1,3}(?:\.\d{3})*|\d+)\s*€/g)];
-        const rawPrice = priceMatches.length
-          ? parseInt(priceMatches[priceMatches.length - 1][1].replace(/\./g, ''))
-          : null;
-        // Sanity cap: real cars don't cost more than 500 000 €
-        const price = (rawPrice && rawPrice <= 500000) ? rawPrice : null;
+        // Price — find the actual car price, not the monthly loan installment.
+        // Cards show e.g. "18.990 €" (price) then "od 156 €/mes" (installment).
+        // Strategy: collect all €-amounts, skip anything that looks like a
+        // monthly rate (followed by /mes, mesečno, /month, or preceded by "od "),
+        // skip amounts < 500 € (no car costs that little), take the first survivor.
+        const allPriceMatches = [...text.matchAll(/\b(\d{1,3}(?:\.\d{3})*|\d{4,6})\s*€/g)];
+        let price = null;
+        for (const m of allPriceMatches) {
+          const val = parseInt(m[1].replace(/\./g, ''));
+          if (val < 500 || val > 500000) continue;           // too small or corrupted
+          const after  = text.slice(m.index + m[0].length, m.index + m[0].length + 20);
+          const before = text.slice(Math.max(0, m.index - 10), m.index);
+          if (/\/mes|mesečno|\/month|rata/i.test(after)) continue;  // installment suffix
+          if (/\bod\b/i.test(before)) continue;                      // "od X €" = from X €/mo
+          price = val;
+          break; // first valid match is the actual price
+        }
         if (!price) continue;
         if (MIN_PRICE && price < MIN_PRICE) continue;
         if (MAX_PRICE && price > MAX_PRICE) continue;

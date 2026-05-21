@@ -14,7 +14,7 @@ const MIN_YEAR = parseInt(process.env.MIN_YEAR || '2014');
 // MONITOR_TYPE: 'suv' (default) or 'cars'
 const MONITOR_TYPE = (process.env.MONITOR_TYPE || 'suv').toLowerCase();
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'goranruter1@gmail.com';
-const SEEN_FILE = path.join(__dirname, `../seen_${MONITOR_TYPE}.json`);
+const SEEN_FILE = path.join(__dirname, '../seen.json');
 
 const SEARCHES_SUV = [
   { brand: 'nissan',        model: 'qashqai',   label: 'Nissan Qashqai',        keywords: ['qashqai'] },

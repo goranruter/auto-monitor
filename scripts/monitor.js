@@ -101,46 +101,67 @@ const ACTIVE_SEARCHES = MONITOR_MODELS_ENV
 
 // Generation ranges per model — used to ensure fair price comparison within same generation
 const GENERATIONS = {
-  'volkswagen-golf':        [{from:2013,to:2019,gen:'7'},{from:2020,to:9999,gen:'8'}],
-  'volkswagen-passat':      [{from:2015,to:9999,gen:'B8'},{from:2011,to:2014,gen:'B7'}],
+  'volkswagen-golf':        [{from:2013,to:2019,gen:'7'},{from:2020,to:9999,gen:'8'},{from:2009,to:2012,gen:'6'},{from:2004,to:2008,gen:'5'}],
+  'volkswagen-passat':      [{from:2015,to:9999,gen:'B8'},{from:2011,to:2014,gen:'B7'},{from:2005,to:2010,gen:'B6'}],
   'volkswagen-tiguan':      [{from:2016,to:9999,gen:'2'},{from:2007,to:2015,gen:'1'}],
-  'volkswagen-touareg':     [{from:2018,to:9999,gen:'3'},{from:2010,to:2017,gen:'2'}],
-  'skoda-octavia':          [{from:2020,to:9999,gen:'4'},{from:2013,to:2019,gen:'3'}],
-  'skoda-superb':           [{from:2015,to:9999,gen:'3'}],
+  'volkswagen-touareg':     [{from:2018,to:9999,gen:'3'},{from:2010,to:2017,gen:'2'},{from:2002,to:2009,gen:'1'}],
+  'volkswagen-polo':        [{from:2018,to:9999,gen:'6'},{from:2009,to:2017,gen:'5'},{from:2002,to:2008,gen:'4'}],
+  'skoda-octavia':          [{from:2020,to:9999,gen:'4'},{from:2013,to:2019,gen:'3'},{from:2004,to:2012,gen:'2'}],
+  'skoda-superb':           [{from:2015,to:9999,gen:'3'},{from:2008,to:2014,gen:'2'}],
+  'skoda-fabia':            [{from:2021,to:9999,gen:'4'},{from:2015,to:2021,gen:'3'},{from:2007,to:2014,gen:'2'}],
   'skoda-kodiaq':           [{from:2017,to:9999,gen:'1'}],
-  'seat-leon':              [{from:2020,to:9999,gen:'4'},{from:2013,to:2019,gen:'3'}],
-  'audi-a4':                [{from:2016,to:9999,gen:'B9'},{from:2008,to:2015,gen:'B8'}],
-  'audi-a6':                [{from:2018,to:9999,gen:'C8'},{from:2011,to:2017,gen:'C7'}],
+  'seat-leon':              [{from:2020,to:9999,gen:'4'},{from:2013,to:2019,gen:'3'},{from:2005,to:2012,gen:'2'}],
+  'seat-ibiza':             [{from:2017,to:9999,gen:'5'},{from:2008,to:2016,gen:'4'},{from:2002,to:2007,gen:'3'}],
+  'audi-a3':                [{from:2020,to:9999,gen:'4'},{from:2013,to:2019,gen:'3'},{from:2004,to:2012,gen:'2'}],
+  'audi-a4':                [{from:2016,to:9999,gen:'B9'},{from:2008,to:2015,gen:'B8'},{from:2001,to:2007,gen:'B7'}],
+  'audi-a6':                [{from:2018,to:9999,gen:'C8'},{from:2011,to:2017,gen:'C7'},{from:2004,to:2010,gen:'C6'}],
   'audi-q3':                [{from:2019,to:9999,gen:'2'},{from:2011,to:2018,gen:'1'}],
   'audi-q5':                [{from:2017,to:9999,gen:'2'},{from:2008,to:2016,gen:'1'}],
-  'bmw-serija-3':           [{from:2019,to:9999,gen:'G20'},{from:2012,to:2018,gen:'F30'}],
-  'bmw-serija-5':           [{from:2017,to:9999,gen:'G30'},{from:2010,to:2016,gen:'F10'}],
-  'bmw-x1':                 [{from:2015,to:2021,gen:'F48'},{from:2022,to:9999,gen:'U11'}],
-  'bmw-x3':                 [{from:2018,to:9999,gen:'G01'},{from:2011,to:2017,gen:'F25'}],
-  'mercedes-benz-c-klasa':  [{from:2014,to:9999,gen:'W205'},{from:2007,to:2013,gen:'W204'}],
-  'mercedes-benz-e-klasa':  [{from:2016,to:9999,gen:'W213'},{from:2009,to:2015,gen:'W212'}],
-  'mercedes-benz-glc':      [{from:2016,to:2022,gen:'X253'},{from:2022,to:9999,gen:'X254'}],
-  'opel-astra':             [{from:2016,to:2021,gen:'K'},{from:2010,to:2015,gen:'J'},{from:2022,to:9999,gen:'L'}],
+  'bmw-serija-1':           [{from:2019,to:9999,gen:'F40'},{from:2011,to:2018,gen:'F20'},{from:2004,to:2010,gen:'E87'}],
+  'bmw-serija-3':           [{from:2019,to:9999,gen:'G20'},{from:2012,to:2018,gen:'F30'},{from:2005,to:2011,gen:'E90'}],
+  'bmw-serija-5':           [{from:2017,to:9999,gen:'G30'},{from:2010,to:2016,gen:'F10'},{from:2004,to:2009,gen:'E60'}],
+  'bmw-x1':                 [{from:2022,to:9999,gen:'U11'},{from:2015,to:2021,gen:'F48'},{from:2009,to:2014,gen:'E84'}],
+  'bmw-x3':                 [{from:2018,to:9999,gen:'G01'},{from:2011,to:2017,gen:'F25'},{from:2004,to:2010,gen:'E83'}],
+  'bmw-x5':                 [{from:2018,to:9999,gen:'G05'},{from:2013,to:2018,gen:'F15'},{from:2007,to:2013,gen:'E70'}],
+  'mercedes-benz-a-klasa':  [{from:2018,to:9999,gen:'W177'},{from:2013,to:2017,gen:'W176'},{from:2005,to:2012,gen:'W169'}],
+  'mercedes-benz-c-klasa':  [{from:2021,to:9999,gen:'W206'},{from:2014,to:2020,gen:'W205'},{from:2007,to:2013,gen:'W204'},{from:2001,to:2006,gen:'W203'}],
+  'mercedes-benz-e-klasa':  [{from:2016,to:9999,gen:'W213'},{from:2009,to:2015,gen:'W212'},{from:2003,to:2008,gen:'W211'}],
+  'mercedes-benz-glc':      [{from:2022,to:9999,gen:'X254'},{from:2016,to:2022,gen:'X253'}],
+  'mercedes-benz-glk':      [{from:2008,to:2015,gen:'X204'}],
+  'opel-astra':             [{from:2022,to:9999,gen:'L'},{from:2016,to:2021,gen:'K'},{from:2010,to:2015,gen:'J'},{from:2004,to:2009,gen:'H'}],
   'opel-insignia':          [{from:2017,to:9999,gen:'B'},{from:2009,to:2016,gen:'A'}],
-  'ford-focus':             [{from:2018,to:9999,gen:'4'},{from:2011,to:2017,gen:'3'}],
-  'ford-mondeo':            [{from:2015,to:9999,gen:'5'}],
-  'ford-kuga':              [{from:2020,to:9999,gen:'3'},{from:2013,to:2019,gen:'2'}],
-  'renault-megane':         [{from:2016,to:9999,gen:'4'},{from:2008,to:2015,gen:'3'}],
+  'opel-corsa':             [{from:2019,to:9999,gen:'F'},{from:2015,to:2019,gen:'E'},{from:2006,to:2014,gen:'D'}],
+  'ford-focus':             [{from:2018,to:9999,gen:'4'},{from:2011,to:2017,gen:'3'},{from:2005,to:2010,gen:'2'}],
+  'ford-fiesta':            [{from:2017,to:9999,gen:'7'},{from:2009,to:2016,gen:'6'},{from:2002,to:2008,gen:'5'}],
+  'ford-mondeo':            [{from:2015,to:9999,gen:'5'},{from:2007,to:2014,gen:'4'}],
+  'ford-kuga':              [{from:2020,to:9999,gen:'3'},{from:2013,to:2019,gen:'2'},{from:2008,to:2012,gen:'1'}],
+  'renault-megane':         [{from:2016,to:9999,gen:'4'},{from:2008,to:2015,gen:'3'},{from:2003,to:2007,gen:'2'}],
+  'renault-clio':           [{from:2019,to:9999,gen:'5'},{from:2013,to:2019,gen:'4'},{from:2006,to:2012,gen:'3'}],
   'renault-kadjar':         [{from:2015,to:2022,gen:'1'}],
-  'peugeot-308':            [{from:2021,to:9999,gen:'3'},{from:2013,to:2020,gen:'2'}],
+  'peugeot-308':            [{from:2021,to:9999,gen:'3'},{from:2013,to:2020,gen:'2'},{from:2007,to:2013,gen:'1'}],
   'peugeot-3008':           [{from:2016,to:9999,gen:'2'},{from:2009,to:2015,gen:'1'}],
-  'toyota-auris':           [{from:2013,to:2018,gen:'2'}],
-  'toyota-rav4':            [{from:2019,to:9999,gen:'5'},{from:2013,to:2018,gen:'4'}],
-  'hyundai-i30':            [{from:2017,to:9999,gen:'3'},{from:2012,to:2016,gen:'2'}],
-  'hyundai-tucson':         [{from:2021,to:9999,gen:'4'},{from:2015,to:2020,gen:'3'}],
+  'toyota-auris':           [{from:2013,to:2018,gen:'2'},{from:2007,to:2012,gen:'1'}],
+  'toyota-corolla':         [{from:2019,to:9999,gen:'12'},{from:2013,to:2018,gen:'11'},{from:2007,to:2012,gen:'10'}],
+  'toyota-rav4':            [{from:2019,to:9999,gen:'5'},{from:2013,to:2018,gen:'4'},{from:2006,to:2012,gen:'3'},{from:2001,to:2005,gen:'2'}],
+  'toyota-yaris':           [{from:2020,to:9999,gen:'4'},{from:2011,to:2019,gen:'3'},{from:2006,to:2010,gen:'2'}],
+  'hyundai-i30':            [{from:2017,to:9999,gen:'3'},{from:2012,to:2016,gen:'2'},{from:2007,to:2011,gen:'1'}],
+  'hyundai-i20':            [{from:2020,to:9999,gen:'3'},{from:2015,to:2019,gen:'2'},{from:2009,to:2014,gen:'1'}],
+  'hyundai-tucson':         [{from:2021,to:9999,gen:'4'},{from:2015,to:2020,gen:'3'},{from:2010,to:2015,gen:'2'}],
   'hyundai-ix35':           [{from:2009,to:2015,gen:'1'}],
-  'kia-ceed':               [{from:2018,to:9999,gen:'3'},{from:2012,to:2017,gen:'2'}],
-  'kia-sportage':           [{from:2022,to:9999,gen:'5'},{from:2016,to:2021,gen:'4'}],
-  'nissan-qashqai':         [{from:2021,to:9999,gen:'3'},{from:2014,to:2020,gen:'2'}],
+  'hyundai-santa-fe':       [{from:2018,to:9999,gen:'4'},{from:2013,to:2018,gen:'3'},{from:2006,to:2012,gen:'2'}],
+  'kia-ceed':               [{from:2018,to:9999,gen:'3'},{from:2012,to:2017,gen:'2'},{from:2007,to:2011,gen:'1'}],
+  'kia-sportage':           [{from:2022,to:9999,gen:'5'},{from:2016,to:2021,gen:'4'},{from:2010,to:2015,gen:'3'}],
+  'kia-sorento':            [{from:2020,to:9999,gen:'4'},{from:2015,to:2020,gen:'3'},{from:2010,to:2014,gen:'2'}],
+  'nissan-qashqai':         [{from:2021,to:9999,gen:'3'},{from:2014,to:2020,gen:'2'},{from:2007,to:2013,gen:'1'}],
+  'nissan-x-trail':         [{from:2022,to:9999,gen:'4'},{from:2014,to:2021,gen:'3'},{from:2007,to:2013,gen:'2'}],
   'mazda-cx-5':             [{from:2017,to:9999,gen:'2'},{from:2012,to:2016,gen:'1'}],
-  'jeep-compass':           [{from:2017,to:9999,gen:'2'}],
-  'mitsubishi-outlander':   [{from:2021,to:9999,gen:'4'},{from:2012,to:2020,gen:'3'}],
-  'honda-cr-v':             [{from:2017,to:9999,gen:'5'},{from:2012,to:2016,gen:'4'}],
+  'mazda-mazda3':           [{from:2019,to:9999,gen:'4'},{from:2014,to:2018,gen:'3'},{from:2009,to:2013,gen:'2'}],
+  'mazda-mazda6':           [{from:2013,to:9999,gen:'3'},{from:2008,to:2012,gen:'2'}],
+  'jeep-compass':           [{from:2017,to:9999,gen:'2'},{from:2007,to:2016,gen:'1'}],
+  'jeep-renegade':          [{from:2019,to:9999,gen:'2'},{from:2015,to:2018,gen:'1'}],
+  'mitsubishi-outlander':   [{from:2021,to:9999,gen:'4'},{from:2012,to:2020,gen:'3'},{from:2006,to:2011,gen:'2'}],
+  'honda-cr-v':             [{from:2017,to:9999,gen:'5'},{from:2012,to:2016,gen:'4'},{from:2007,to:2011,gen:'3'}],
+  'honda-civic':            [{from:2017,to:9999,gen:'10'},{from:2012,to:2016,gen:'9'},{from:2006,to:2011,gen:'8'}],
 };
 
 function getGeneration(brand, model, year) {
@@ -650,9 +671,15 @@ function scoreListing(listing, allListings) {
   const others = allListings.filter((l) => l.id !== listing.id && l.price >= MIN_PRICE);
 
   const genOk  = (l) => {
-    if (!generation) return true;
-    const lg = getGeneration(l.brand, l.model, l.year);
-    return !lg || lg === generation;
+    if (generation) {
+      // Known generation — compare only within same gen
+      const lg = getGeneration(l.brand, l.model, l.year);
+      return !lg || lg === generation;
+    }
+    // No generation mapping — fall back to year ±4 so we never mix
+    // a 2005 car with 2020 cars just because neither has a gen entry
+    if (year && l.year) return Math.abs(l.year - year) <= 4;
+    return true;
   };
   const yearOk = (l) => !year || !l.year || Math.abs(l.year - year) <= 2;
   const kmOk   = (l) => !km || !l.km || (l.km >= km * 0.6 && l.km <= km * 1.4);

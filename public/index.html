@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Auto Monitor</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0e1117;
+      --surface: #161b22;
+      --surface2: #1c2330;
+      --border: #30363d;
+      --accent: #238636;
+      --accent-hover: #2ea043;
+      --danger: #da3633;
+      --warning: #d29922;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --green: #3fb950;
+      --yellow: #d29922;
+      --red: #f85149;
+      --blue: #58a6ff;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* ── Header ─────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+    .logo span { color: var(--blue); }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+    .status-dot.running {
+      background: var(--green);
+      box-shadow: 0 0 0 3px rgba(63,185,80,.25);
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%,100% { opacity: 1; }
+      50%      { opacity: .5; }
+    }
+
+    /* ── Main layout ─────────────────────────────────── */
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 16px;
+    }
+
+    /* ── Stat cards ──────────────────────────────────── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 18px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .stat-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* ── Controls ────────────────────────────────────── */
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 7px;
+      padding: 9px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      transition: background .15s, opacity .15s;
+    }
+
+    #btn-run {
+      background: var(--accent);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #btn-run:hover:not(:disabled) { background: var(--accent-hover); }
+    #btn-run:disabled { opacity: .5; cursor: not-allowed; }
+
+    #btn-stop {
+      background: var(--danger);
+      color: #fff;
+      display: none;
+    }
+    #btn-stop:hover { filter: brightness(1.1); }
+
+    #btn-clear-log {
+      background: var(--surface2);
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    #btn-clear-log:hover { color: var(--text); }
+
+    .last-run {
+      margin-left: auto;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* ── Terminal ────────────────────────────────────── */
+    .terminal-wrap {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+
+    .terminal-header {
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 14px;
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 600;
+      letter-spacing: .5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .terminal-dots { display: flex; gap: 6px; }
+    .terminal-dots span {
+      width: 10px; height: 10px; border-radius: 50%;
+    }
+    .terminal-dots span:nth-child(1) { background: #ff5f57; }
+    .terminal-dots span:nth-child(2) { background: #febc2e; }
+    .terminal-dots span:nth-child(3) { background: #28c840; }
+
+    #terminal {
+      font-family: 'Fira Code', 'Cascadia Code', 'SF Mono', 'Consolas', monospace;
+      font-size: 12px;
+      padding: 14px 16px;
+      height: 260px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: #adbac7;
+    }
+
+    #terminal .t-start  { color: var(--blue);    font-weight: 700; }
+    #terminal .t-done   { color: var(--green);   font-weight: 700; }
+    #terminal .t-error  { color: var(--red);     }
+    #terminal .t-log    { color: #adbac7; }
+    #terminal .t-time   { color: var(--muted);   font-size: 10px; margin-right: 6px; }
+
+    /* ── Section heading ─────────────────────────────── */
+    .section-heading {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .section-heading h2 {
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .section-heading .badge {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2px 9px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .section-heading .refresh-hint {
+      margin-left: auto;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    /* ── Deal cards ──────────────────────────────────── */
+    #deals-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+      gap: 14px;
+    }
+
+    .deal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      transition: transform .15s, border-color .15s;
+    }
+    .deal-card:hover {
+      transform: translateY(-2px);
+      border-color: #444c56;
+    }
+
+    .deal-img-wrap {
+      position: relative;
+      height: 170px;
+      background: var(--surface2);
+      overflow: hidden;
+    }
+    .deal-img-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .deal-img-wrap .no-img {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--muted);
+      font-size: 32px;
+    }
+
+    .rating-badge {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      border-radius: 8px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .3px;
+      backdrop-filter: blur(4px);
+    }
+    .rating-excellent { background: rgba(35,134,54,.9);  color: #aff3be; }
+    .rating-good      { background: rgba(63,185,80,.85); color: #0d1117; }
+    .rating-fair      { background: rgba(100,100,110,.8);color: #e6edf3; }
+    .rating-high      { background: rgba(210,153,34,.9); color: #0d1117; }
+    .rating-veryhigh  { background: rgba(218,54,51,.9);  color: #ffc8c8; }
+
+    .score-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(13,17,23,.8);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 4px 9px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text);
+      backdrop-filter: blur(4px);
+    }
+
+    .deal-body { padding: 14px; }
+
+    .deal-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .deal-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .deal-price-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .deal-price {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--green);
+    }
+
+    .deal-median {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .deal-saving {
+      margin-left: auto;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--green);
+    }
+
+    .deal-specs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .spec-chip {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 2px 7px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .equip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-bottom: 12px;
+    }
+
+    .equip-chip {
+      background: rgba(88,166,255,.12);
+      border: 1px solid rgba(88,166,255,.25);
+      border-radius: 5px;
+      padding: 2px 7px;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--blue);
+    }
+
+    .equip-chip.damage {
+      background: rgba(218,54,51,.12);
+      border-color: rgba(218,54,51,.3);
+      color: var(--red);
+    }
+
+    .deal-link {
+      display: block;
+      text-align: center;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 7px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--blue);
+      text-decoration: none;
+      transition: background .15s, border-color .15s;
+    }
+    .deal-link:hover {
+      background: rgba(88,166,255,.1);
+      border-color: rgba(88,166,255,.4);
+    }
+
+    /* ── Empty / loading state ───────────────────────── */
+    .empty-state {
+      grid-column: 1 / -1;
+      padding: 48px 0;
+      text-align: center;
+      color: var(--muted);
+    }
+    .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+
+    /* ── Config bar ──────────────────────────────────── */
+    .config-bar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .config-bar strong { color: var(--text); }
+
+    /* ── Scrollbar ───────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+
+    /* ── Responsive ──────────────────────────────────── */
+    @media (max-width: 600px) {
+      header { padding: 10px 14px; }
+      .logo  { font-size: 15px; }
+      main   { padding: 14px 10px; }
+      .stat-value { font-size: 20px; }
+      #deals-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🚗 Auto<span>Monitor</span></div>
+  <div class="status-pill">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text">Idle</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- Stats row -->
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-label">Deals Found</div>
+      <div class="stat-value" id="stat-deals">—</div>
+      <div class="stat-sub">this run</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Models Checked</div>
+      <div class="stat-value" id="stat-models">—</div>
+      <div class="stat-sub">/ 40 total</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Best Saving</div>
+      <div class="stat-value" id="stat-best-saving" style="color:var(--green)">—</div>
+      <div class="stat-sub">vs market median</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Last Run</div>
+      <div class="stat-value" id="stat-time" style="font-size:16px;padding-top:4px">—</div>
+      <div class="stat-sub" id="stat-date">no data yet</div>
+    </div>
+  </div>
+
+  <!-- Config bar -->
+  <div class="config-bar" id="config-bar">
+    <span>Loading config…</span>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button id="btn-run">
+      <span id="btn-run-icon">▶</span>
+      <span id="btn-run-label">Run Monitor Now</span>
+    </button>
+    <button id="btn-stop">⏹ Stop</button>
+    <button id="btn-clear-log">Clear Log</button>
+    <span class="last-run" id="last-run-text"></span>
+  </div>
+
+  <!-- Terminal -->
+  <div class="terminal-wrap">
+    <div class="terminal-header">
+      <div class="terminal-dots">
+        <span></span><span></span><span></span>
+      </div>
+      LIVE LOG
+    </div>
+    <div id="terminal"><span class="t-muted" style="color:var(--muted)">Waiting for run…</span></div>
+  </div>
+
+  <!-- Deal cards -->
+  <div class="section-heading">
+    <h2>Latest Deals</h2>
+    <span class="badge" id="deals-badge">0</span>
+    <span class="refresh-hint" id="refresh-hint"></span>
+  </div>
+
+  <div id="deals-grid">
+    <div class="empty-state">
+      <div class="icon">🔍</div>
+      <div>No results yet — click <strong>Run Monitor Now</strong> to scan for deals.</div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+/* ── Helpers ─────────────────────────────────────────── */
+const $ = id => document.getElementById(id);
+
+function ratingClass(label) {
+  if (!label) return '';
+  const l = label.toLowerCase();
+  if (l.includes('odlič') || l.includes('excellent')) return 'rating-excellent';
+  if (l.includes('dobra') || l.includes('good'))       return 'rating-good';
+  if (l.includes('fer')  || l.includes('fair'))        return 'rating-fair';
+  if (l.includes('visoka') && !l.includes('pre'))      return 'rating-high';
+  if (l.includes('previsoka') || l.includes('very'))   return 'rating-veryhigh';
+  return 'rating-fair';
+}
+
+function fmtPrice(n) {
+  return n == null ? '?' : n.toLocaleString('de-DE') + ' €';
+}
+
+function savingLabel(price, median) {
+  if (!median || !price) return null;
+  const diff = median - price;
+  if (diff <= 0) return null;
+  return `−${Math.round(diff).toLocaleString('de-DE')} €`;
+}
+
+function equipChips(d) {
+  const chips = [];
+  if (d.has4x4)          chips.push('4x4');
+  if (d.hasPanorama)     chips.push('Panorama');
+  if (d.hasLeather)      chips.push('Koža');
+  if (d.hasNavigation)   chips.push('Navi');
+  if (d.hasHeatedSeats)  chips.push('Grejana sedišta');
+  if (d.isFirstOwner)    chips.push('1. vlasnik');
+  if (d.hasServiceHistory) chips.push('Servisna knjiga');
+  return chips;
+}
+
+/* ── Config ──────────────────────────────────────────── */
+async function loadConfig() {
+  try {
+    const cfg = await fetch('/api/config').then(r => r.json());
+    $('config-bar').innerHTML =
+      `<span>💰 Cena: <strong>${cfg.minPrice.toLocaleString('de-DE')} – ${cfg.maxPrice.toLocaleString('de-DE')} €</strong></span>` +
+      `<span>📅 Min godište: <strong>${cfg.minYear}</strong></span>` +
+      `<span>🎯 Min skor: <strong>${cfg.minScore}</strong></span>` +
+      `<span>📋 Modeli: <strong>${cfg.models}</strong></span>` +
+      `<span>📧 Email: <strong>${cfg.notifyEmail}</strong></span>`;
+  } catch {
+    $('config-bar').innerHTML = '<span style="color:var(--muted)">Config unavailable</span>';
+  }
+}
+
+/* ── Results ─────────────────────────────────────────── */
+async function loadResults() {
+  try {
+    const data = await fetch('/api/results').then(r => r.json());
+    renderResults(data);
+  } catch { /* silent */ }
+}
+
+function renderResults(data) {
+  const deals = data.deals || [];
+  const ts    = data.timestamp;
+
+  $('stat-deals').textContent   = deals.length;
+  $('stat-models').textContent  = data.modelsChecked || '—';
+  $('deals-badge').textContent  = deals.length;
+
+  if (ts) {
+    const d = new Date(ts);
+    $('stat-time').textContent = d.toLocaleTimeString('sr-RS', { hour: '2-digit', minute: '2-digit' });
+    $('stat-date').textContent = d.toLocaleDateString('sr-RS', { day: 'numeric', month: 'short', year: 'numeric' });
+    $('refresh-hint').textContent = `Last updated ${d.toLocaleTimeString('sr-RS', {hour:'2-digit',minute:'2-digit'})}`;
+  }
+
+  // Best saving
+  const savings = deals.map(d => d.marketMedian ? d.marketMedian - d.price : 0).filter(s => s > 0);
+  if (savings.length) {
+    $('stat-best-saving').textContent = '−' + Math.round(Math.max(...savings)).toLocaleString('de-DE') + ' €';
+  }
+
+  const grid = $('deals-grid');
+  if (!deals.length) {
+    grid.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><div>No deals found in this run.</div></div>`;
+    return;
+  }
+
+  // Sort by score desc
+  const sorted = [...deals].sort((a, b) => (b.score || 0) - (a.score || 0));
+
+  grid.innerHTML = sorted.map(d => {
+    const chips   = equipChips(d);
+    const saving  = savingLabel(d.price, d.marketMedian);
+    const rClass  = ratingClass(d.priceRating || '');
+
+    return `
+<div class="deal-card">
+  <div class="deal-img-wrap">
+    ${d.image
+      ? `<img src="${d.image}" alt="${d.title || ''}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+      : ''}
+    <div class="no-img" ${d.image ? 'style="display:none"' : ''}>🚗</div>
+    ${d.score ? `<div class="score-badge">⚡ ${d.score}</div>` : ''}
+    ${d.priceRating ? `<div class="rating-badge ${rClass}">${d.priceRating}</div>` : ''}
+  </div>
+  <div class="deal-body">
+    <div class="deal-title" title="${d.title || ''}">${d.title || d.model || '—'}</div>
+    <div class="deal-sub">${[d.year, d.km ? d.km.toLocaleString('de-DE') + ' km' : null, d.fuel, d.transmission].filter(Boolean).join(' · ')}</div>
+
+    <div class="deal-price-row">
+      <div class="deal-price">${fmtPrice(d.price)}</div>
+      ${d.marketMedian ? `<div class="deal-median">med. ${fmtPrice(Math.round(d.marketMedian))}</div>` : ''}
+      ${saving ? `<div class="deal-saving">${saving}</div>` : ''}
+    </div>
+
+    ${chips.length ? `
+    <div class="equip-row">
+      ${chips.map(c => `<span class="equip-chip">${c}</span>`).join('')}
+      ${d.hasAccident ? `<span class="equip-chip damage">⚠ Havarisano</span>` : ''}
+    </div>` : (d.hasAccident ? `<div class="equip-row"><span class="equip-chip damage">⚠ Havarisano</span></div>` : '')}
+
+    <a class="deal-link" href="${d.url}" target="_blank" rel="noopener">Pogledaj oglas →</a>
+  </div>
+</div>`;
+  }).join('');
+}
+
+/* ── Terminal ─────────────────────────────────────────── */
+const terminal = $('terminal');
+let autoScroll = true;
+
+terminal.addEventListener('scroll', () => {
+  autoScroll = terminal.scrollTop + terminal.clientHeight >= terminal.scrollHeight - 20;
+});
+
+function termLine(type, text, time) {
+  const line = document.createElement('div');
+  if (time) {
+    const ts = document.createElement('span');
+    ts.className = 't-time';
+    ts.textContent = time;
+    line.appendChild(ts);
+  }
+  const content = document.createElement('span');
+  content.className = `t-${type}`;
+  content.textContent = text;
+  line.appendChild(content);
+  terminal.appendChild(line);
+  if (autoScroll) terminal.scrollTop = terminal.scrollHeight;
+}
+
+/* ── Run / Stop ───────────────────────────────────────── */
+let evtSource = null;
+let isRunning = false;
+
+function setRunning(val) {
+  isRunning = val;
+  $('status-dot').className   = 'status-dot' + (val ? ' running' : '');
+  $('status-text').textContent = val ? 'Running…' : 'Idle';
+  $('btn-run').disabled        = val;
+  $('btn-stop').style.display  = val ? 'inline-block' : 'none';
+  $('btn-run-icon').textContent = '▶';
+  $('btn-run-label').textContent = 'Run Monitor Now';
+}
+
+$('btn-run').addEventListener('click', () => {
+  if (isRunning) return;
+
+  terminal.innerHTML = '';
+  autoScroll = true;
+  setRunning(true);
+
+  evtSource = new EventSource('/api/run');
+
+  evtSource.onmessage = e => {
+    const { type, text, time } = JSON.parse(e.data);
+    termLine(type, text, time);
+    if (type === 'done') {
+      evtSource.close();
+      evtSource = null;
+      setRunning(false);
+      // Reload results after a short delay
+      setTimeout(loadResults, 1200);
+    }
+  };
+
+  evtSource.onerror = () => {
+    termLine('error', 'Connection lost.', null);
+    evtSource.close();
+    evtSource = null;
+    setRunning(false);
+    setTimeout(loadResults, 1200);
+  };
+});
+
+$('btn-stop').addEventListener('click', async () => {
+  await fetch('/api/stop', { method: 'POST' });
+  if (evtSource) { evtSource.close(); evtSource = null; }
+  setRunning(false);
+  termLine('error', '=== Stopped by user ===', null);
+});
+
+$('btn-clear-log').addEventListener('click', () => {
+  terminal.innerHTML = '<span style="color:var(--muted)">Log cleared.</span>';
+});
+
+/* ── Status poll ──────────────────────────────────────── */
+async function checkStatus() {
+  try {
+    const { isRunning: r } = await fetch('/api/status').then(x => x.json());
+    if (r !== isRunning) setRunning(r);
+  } catch {}
+}
+
+/* ── Init ─────────────────────────────────────────────── */
+loadConfig();
+loadResults();
+checkStatus();
+setInterval(checkStatus, 5000);
+setInterval(loadResults, 30000);   // auto-refresh results every 30s
+</script>
+</body>
+</html>

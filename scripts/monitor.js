@@ -15,6 +15,9 @@ const MIN_YEAR = parseInt(process.env.MIN_YEAR || '2014');
 const MONITOR_TYPE = (process.env.MONITOR_TYPE || 'suv').toLowerCase();
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'goranruter1@gmail.com';
 const SEEN_FILE = path.join(__dirname, '../seen.json');
+const BASELINE_CACHE_FILE = path.join(__dirname, '../baseline_cache.json');
+const BASELINE_CACHE_HOURS = parseInt(process.env.BASELINE_CACHE_HOURS || '8');
+const RESULTS_FILE = path.join(__dirname, '../last_results.json');
 
 const SEARCHES_SUV = [
   { brand: 'nissan',        model: 'qashqai',   label: 'Nissan Qashqai',        keywords: ['qashqai'] },
@@ -144,6 +147,26 @@ function loadSeen() {
 
 function saveSeen(seen) {
   fs.writeFileSync(SEEN_FILE, JSON.stringify(seen, null, 2));
+}
+
+function loadBaselineCache() {
+  try {
+    const data = JSON.parse(fs.readFileSync(BASELINE_CACHE_FILE, 'utf8'));
+    const ageHours = (Date.now() - new Date(data.timestamp).getTime()) / 3600000;
+    if (ageHours < BASELINE_CACHE_HOURS) {
+      console.log(`  Using cached baseline (${ageHours.toFixed(1)}h old, refresh after ${BASELINE_CACHE_HOURS}h)`);
+      return data.models;
+    }
+  } catch {}
+  return null;
+}
+
+function saveBaselineCache(models) {
+  fs.writeFileSync(BASELINE_CACHE_FILE, JSON.stringify({ timestamp: new Date().toISOString(), models }, null, 2));
+}
+
+function saveResults(results) {
+  fs.writeFileSync(RESULTS_FILE, JSON.stringify(results, null, 2));
 }
 
 function parsePrice(str) {
@@ -359,8 +382,20 @@ async function fetchListingsFromPage(url, search) {
           ? -Math.round(12 * monthlyRate)
           : Math.round(regMonths * monthlyRate);
 
+        // Equipment detection
+        const has4x4       = /\b4x4\b|4wd|awd|quattro|xdrive|4motion|syncro|all.?wheel/i.test(text);
+        const hasPanorama  = /panoram|panoramski|sunroof|stakleni krov/i.test(text);
+        const hasLeather   = /kožna|koža\b|leather|leder/i.test(text);
+        const hasNavigation= /navigaci|navi\b|gps navigaci/i.test(text);
+        const hasHeatedSeats=/grejana sedišta|grejana sedista|heated seat/i.test(text);
+
+        // Condition signals
+        const hasAccident     = /havarisan|havarisano|udaren|oštećen(?!a reg)/i.test(text);
+        const isFirstOwner    = /prvi vlasnik|1\.\s*vlasnik|1 vlasnik/i.test(text);
+        const hasServiceHistory=/redovno servisan|servisna knjiga|kompletan servis/i.test(text);
+
         const id = `${brand}-${model}-${price}-${km || 0}-${year || 0}`;
-        listings.push({ id, title, price, year, km, engine, engineCC, location, link: href, image, fuel, transmission, regMonths, notRegistered, annualRegCostEur, regBonus, searchLabel: label, brand, model });
+        listings.push({ id, title, price, year, km, engine, engineCC, location, link: href, image, fuel, transmission, regMonths, notRegistered, annualRegCostEur, regBonus, searchLabel: label, brand, model, has4x4, hasPanorama, hasLeather, hasNavigation, hasHeatedSeats, hasAccident, isFirstOwner, hasServiceHistory });
       }
 
       return listings;
@@ -600,9 +635,18 @@ function scoreListing(listing, allListings) {
 
   const median = calcMedian(normalizedPrices.length >= 3 ? normalizedPrices : pool.map(l => l.price));
 
-  // Effective price adjusts for included registration value
+  // Effective price = listed price adjusted for reg, equipment value, and damage
   const regBonus = listing.regBonus || 0;
-  const effectivePrice = listing.price - regBonus;
+  const equipmentBonus =
+    (listing.has4x4        ? 500 : 0) +
+    (listing.hasPanorama   ? 300 : 0) +
+    (listing.hasLeather    ? 200 : 0) +
+    (listing.hasNavigation ? 150 : 0) +
+    (listing.hasHeatedSeats? 100 : 0) +
+    (listing.isFirstOwner  ? 300 : 0) +
+    (listing.hasServiceHistory ? 150 : 0);
+  const damagePenalty = listing.hasAccident ? 2000 : 0;
+  const effectivePrice = listing.price - regBonus - equipmentBonus + damagePenalty;
   const savings = median - effectivePrice;
   const deviationPct = savings / median;
 
@@ -731,26 +775,35 @@ async function main() {
   const seen = loadSeen();
   const newDeals = [];
 
-  // Phase 1: fetch baseline per model (parallel, concurrency=2)
-  console.log('\n--- Phase 1: Fetching baseline listings per model (parallel) ---');
-  const baselineResults = await pMap(SEARCHES, async (search) => {
-    const listings = await fetchBaseline(search);
-    console.log(`  ${search.label}: ${listings.length} baseline listings`);
-    return { key: `${search.brand}-${search.model}`, listings };
-  }, 2);
-
-  // Map: modelKey → baseline listings
-  const baselineByModel = {};
-  for (const { key, listings } of baselineResults) {
-    baselineByModel[key] = listings;
+  // Phase 1: baseline — use cache if fresh, otherwise re-fetch
+  console.log('\n--- Phase 1: Fetching baseline listings per model ---');
+  let baselineByModel = loadBaselineCache();
+  let totalBaseline = 0;
+  if (!baselineByModel) {
+    const baselineResults = await pMap(SEARCHES, async (search) => {
+      const listings = await fetchBaseline(search);
+      console.log(`  ${search.label}: ${listings.length} baseline listings`);
+      return { key: `${search.brand}-${search.model}`, listings };
+    }, 2);
+    baselineByModel = {};
+    for (const { key, listings } of baselineResults) {
+      baselineByModel[key] = listings;
+    }
+    saveBaselineCache(baselineByModel);
   }
-  const totalBaseline = baselineResults.reduce((s, r) => s + r.listings.length, 0);
-  console.log(`Total baseline: ${totalBaseline} listings across ${SEARCHES.length} models`);
+  totalBaseline = Object.values(baselineByModel).reduce((s, l) => s + l.length, 0);
+  console.log(`Baseline pool: ${totalBaseline} listings across ${SEARCHES.length} models`);
 
   // Phase 2: fetch 24h listings per model, score against that model's own baseline
   console.log('\n--- Phase 2: Checking new listings (parallel) ---');
   const phase2Results = await pMap(SEARCHES, async (search) => {
-    const rawListings = await fetchListings(search, true);
+    let rawListings = await fetchListings(search, true);
+    // Retry once on empty result
+    if (rawListings.length === 0) {
+      await new Promise(r => setTimeout(r, 3000));
+      rawListings = await fetchListings(search, true);
+      if (rawListings.length > 0) console.log(`  Retry succeeded for ${search.label}`);
+    }
 
     // Deduplicate by ID — keep the entry with an image when there are duplicates
     const dedupMap = new Map();
@@ -800,6 +853,17 @@ async function main() {
   saveSeen(seen);
 
   console.log(`\nTotal top deals found: ${newDeals.length}`);
+
+  // Save results for GUI
+  saveResults({
+    timestamp: new Date().toISOString(),
+    deals: newDeals,
+    modelsChecked: SEARCHES.length,
+    totalBaselineListings: totalBaseline,
+    minScore: MIN_DEAL_SCORE,
+    priceRange: { min: MIN_PRICE, max: MAX_PRICE },
+  });
+
   if (newDeals.length > 0) {
     await sendEmail(newDeals);
   } else {
@@ -809,8 +873,13 @@ async function main() {
   console.log('=== Done ===\n');
 }
 
-main().catch(async (err) => {
-  if (browser) await browser.close();
-  console.error('Fatal error:', err);
-  process.exit(1);
-});
+// Allow both direct CLI use and require() from server.js
+if (require.main === module) {
+  main().catch(async (err) => {
+    if (browser) await browser.close();
+    console.error('Fatal error:', err);
+    process.exit(1);
+  });
+}
+
+module.exports = { main };

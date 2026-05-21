@@ -7,8 +7,8 @@ const path = require('path');
 const GMAIL_USER = process.env.GMAIL_USER;
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 const MIN_DEAL_SCORE = parseInt(process.env.MIN_DEAL_SCORE || '80');
-const MIN_PRICE = parseInt(process.env.MIN_PRICE || '3000');
-const MAX_PRICE = parseInt(process.env.MAX_PRICE || '20000');
+const MIN_PRICE = process.env.MIN_PRICE ? parseInt(process.env.MIN_PRICE) : null;
+const MAX_PRICE = process.env.MAX_PRICE ? parseInt(process.env.MAX_PRICE) : null;
 const MIN_YEAR = parseInt(process.env.MIN_YEAR || '2000');
 const MAX_YEAR = process.env.MAX_YEAR ? parseInt(process.env.MAX_YEAR) : null;
 
@@ -396,7 +396,9 @@ async function fetchListingsFromPage(url, search) {
         // Price: find € in text
         const priceMatch = text.match(/([\d\.\s]+)\s*€/);
         const price = priceMatch ? parseInt(priceMatch[1].replace(/[^\d]/g, '')) : null;
-        if (!price || price < MIN_PRICE || price > MAX_PRICE) continue;
+        if (!price) continue;
+        if (MIN_PRICE && price < MIN_PRICE) continue;
+        if (MAX_PRICE && price > MAX_PRICE) continue;
 
         // Year — try dedicated element first, then regex on full text
         let year = null;
@@ -610,7 +612,9 @@ function parseListings(html, search) {
     const engine = $el.find('[class*="engine"], [class*="motor"]').first().text().trim() || '';
     const location = $el.find('[class*="location"], [class*="lokacija"], [class*="city"], [class*="grad"]').first().text().trim() || '';
 
-    if (!price || price < MIN_PRICE || price > MAX_PRICE) return;
+    if (!price) return;
+    if (MIN_PRICE && price < MIN_PRICE) return;
+    if (MAX_PRICE && price > MAX_PRICE) return;
     if (year && year < MIN_YEAR) return;
     if (year && MAX_YEAR && year > MAX_YEAR) return;
 
@@ -630,10 +634,12 @@ function parseListings(html, search) {
 }
 
 async function fetchListings(search, last24h = false) {
-  const yearTo = MAX_YEAR || '';
+  const priceFrom = MIN_PRICE || '';
+  const priceTo   = MAX_PRICE || '';
+  const yearTo    = MAX_YEAR  || '';
   const url = last24h
-    ? `https://www.polovniautomobili.com/auto-oglasi/poslednja24h?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&price_to=${MAX_PRICE}&year_from=${MIN_YEAR}&year_to=${yearTo}&modeltxt=&showOldNew=all&country=&city=&submit_1=&page=&sort=`
-    : `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&price_to=${MAX_PRICE}&year_from=${MIN_YEAR}&year_to=${yearTo}&sort=date_desc&showOldNew=all&page=1`;
+    ? `https://www.polovniautomobili.com/auto-oglasi/poslednja24h?brand=${search.brand}&model=${search.model}&price_from=${priceFrom}&price_to=${priceTo}&year_from=${MIN_YEAR}&year_to=${yearTo}&modeltxt=&showOldNew=all&country=&city=&submit_1=&page=&sort=`
+    : `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${priceFrom}&price_to=${priceTo}&year_from=${MIN_YEAR}&year_to=${yearTo}&sort=date_desc&showOldNew=all&page=1`;
   return fetchListingsFromPage(url, search);
 }
 
@@ -642,8 +648,10 @@ async function fetchBaseline(search) {
   let page = 1;
   let thinStreak = 0; // consecutive pages with ≤2 listings
   while (true) {
-    const yearTo = MAX_YEAR || '';
-    const url = `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&price_to=${MAX_PRICE}&year_from=${MIN_YEAR}&year_to=${yearTo}&sort=date_desc&showOldNew=all&page=${page}`;
+    const priceFrom = MIN_PRICE || '';
+    const priceTo   = MAX_PRICE || '';
+    const yearTo    = MAX_YEAR  || '';
+    const url = `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${priceFrom}&price_to=${priceTo}&year_from=${MIN_YEAR}&year_to=${yearTo}&sort=date_desc&showOldNew=all&page=${page}`;
     const listings = await fetchListingsFromPage(url, search);
     if (listings.length === 0) break;
     results.push(...listings);
@@ -668,7 +676,7 @@ function scoreListing(listing, allListings) {
   const fuel = listing.fuel;
   const transmission = listing.transmission;
   const generation = getGeneration(listing.brand, listing.model, year);
-  const others = allListings.filter((l) => l.id !== listing.id && l.price >= MIN_PRICE);
+  const others = allListings.filter((l) => l.id !== listing.id && (!MIN_PRICE || l.price >= MIN_PRICE));
 
   const genOk  = (l) => {
     if (generation) {
@@ -886,7 +894,7 @@ async function pMap(items, fn, concurrency = 5) {
 
 async function main() {
   console.log(`\n=== Auto Monitor Start: ${new Date().toISOString()} ===`);
-  console.log(`Price: ${MIN_PRICE}–${MAX_PRICE}€ | Year: ${MIN_YEAR}–${MAX_YEAR||'any'} | Min score: ${MIN_DEAL_SCORE} | Models: ${ACTIVE_SEARCHES.length}`);
+  console.log(`Price: ${MIN_PRICE||'any'}–${MAX_PRICE||'any'}€ | Year: ${MIN_YEAR}–${MAX_YEAR||'any'} | Min score: ${MIN_DEAL_SCORE} | Models: ${ACTIVE_SEARCHES.length}`);
 
   await initBrowser();
 

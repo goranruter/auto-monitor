@@ -154,6 +154,17 @@ function getGeneration(brand, model, year) {
 let browser = null;
 let browserContext = null;
 
+function isBrowserCrash(err) {
+  const msg = err?.message || '';
+  return (
+    msg.includes('browser has been closed') ||
+    msg.includes('Target page, context or browser has been closed') ||
+    msg.includes('The operation was canceled') ||
+    msg.includes('Connection closed') ||
+    msg.includes('browserContext.newPage')
+  );
+}
+
 async function initBrowser() {
   browser = await chromium.launch({ headless: true });
   browserContext = await browser.newContext({
@@ -167,6 +178,15 @@ async function initBrowser() {
   await page.goto('https://www.polovniautomobili.com', { waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.close();
   console.log('Browser session initialized.');
+}
+
+async function reinitBrowser() {
+  console.log('  ⟳ Browser crashed — reinitializing…');
+  try { await browser.close(); } catch {}
+  browser = null;
+  browserContext = null;
+  await new Promise(r => setTimeout(r, 3000));
+  await initBrowser();
 }
 
 function loadSeen() {
@@ -266,19 +286,31 @@ function calcRegBonus(regMonths, annualCostEur) {
 }
 
 async function fetchPage(url) {
-  const page = await browserContext.newPage();
-  try {
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForTimeout(2000);
-    return await page.content();
-  } finally {
-    await page.close();
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    let page = null;
+    try {
+      page = await browserContext.newPage();
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.waitForTimeout(2000);
+      return await page.content();
+    } catch (err) {
+      if (isBrowserCrash(err) && attempt === 1) {
+        await reinitBrowser();
+        continue;
+      }
+      throw err;
+    } finally {
+      await page?.close().catch(() => {});
+    }
   }
+  throw new Error(`fetchPage failed after retries: ${url}`);
 }
 
 async function fetchListingsFromPage(url, search) {
-  const page = await browserContext.newPage();
+  for (let attempt = 1; attempt <= 2; attempt++) {
+  let page = null;
   try {
+    page = await browserContext.newPage();
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(2000);
 
@@ -437,11 +469,17 @@ async function fetchListingsFromPage(url, search) {
     console.log(`  [${url.includes('poslednja24h') ? '24h' : 'baseline'}] Found ${results.length} listings`);
     return results;
   } catch (err) {
-    console.error(`  Fetch error for ${url}: ${err.message}`);
+    console.error(`  Fetch error for ${url.slice(0, 80)}: ${err.message}`);
+    if (isBrowserCrash(err) && attempt === 1) {
+      await reinitBrowser();
+      continue; // retry with fresh browser
+    }
     return [];
   } finally {
-    await page.close();
+    await page?.close().catch(() => {});
   }
+  } // end retry loop
+  return [];
 }
 
 function parseListings(html, search) {

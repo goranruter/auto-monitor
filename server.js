@@ -127,18 +127,18 @@ app.post('/api/stop', (req, res) => {
   }
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`\n🚗 Auto Monitor GUI → http://localhost:${PORT}\n`);
-});
+function startServer(port) {
+  const server = app.listen(port, () => {
+    console.log(`\n🚗 Auto Monitor GUI → http://localhost:${port}\n`);
+  });
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.warn(`⚠️  Port ${port} in use — trying ${port + 1}…`);
+      startServer(port + 1);
+    } else {
+      throw err;
+    }
+  });
+}
 
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    const fallback = parseInt(PORT) + 1;
-    console.warn(`⚠️  Port ${PORT} in use — trying ${fallback}…`);
-    app.listen(fallback, () => {
-      console.log(`\n🚗 Auto Monitor GUI → http://localhost:${fallback}\n`);
-    });
-  } else {
-    throw err;
-  }
-});
+startServer(parseInt(PORT));

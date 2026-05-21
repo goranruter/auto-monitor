@@ -67,10 +67,35 @@ const SEARCHES_CARS = [
 
 const SEARCHES = [...SEARCHES_SUV, ...SEARCHES_CARS];
 
-// If MONITOR_MODELS env is set (comma-separated "brand-model" keys), run only those
+// If MONITOR_MODELS env is set (comma-separated "brand-model" keys), run only those models.
+// Models not in the predefined SEARCHES list get a generic entry (URL-based filtering is enough).
 const MONITOR_MODELS_ENV = process.env.MONITOR_MODELS;
+
+// Multi-word brand names that contain hyphens — needed to split key → brand + model correctly
+const HYPHEN_BRANDS = ['mercedes-benz', 'land-rover', 'alfa-romeo', 'aston-martin'];
+
+function buildSearchFromKey(key) {
+  // Prefer predefined entry (has keywords, labels etc.)
+  const existing = SEARCHES.find(s => `${s.brand}-${s.model}` === key);
+  if (existing) return existing;
+  // Build generic entry for any other brand/model
+  let brand, model;
+  const hb = HYPHEN_BRANDS.find(b => key.startsWith(b + '-'));
+  if (hb) {
+    brand = hb;
+    model = key.slice(hb.length + 1);
+  } else {
+    const i = key.indexOf('-');
+    brand = key.slice(0, i);
+    model = key.slice(i + 1);
+  }
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+  const label = brand.split('-').map(cap).join(' ') + ' ' + model.split('-').map(cap).join(' ');
+  return { brand, model, label, keywords: [] };
+}
+
 const ACTIVE_SEARCHES = MONITOR_MODELS_ENV
-  ? SEARCHES.filter(s => MONITOR_MODELS_ENV.split(',').includes(`${s.brand}-${s.model}`))
+  ? MONITOR_MODELS_ENV.split(',').filter(Boolean).map(buildSearchFromKey)
   : SEARCHES;
 
 // Generation ranges per model — used to ensure fair price comparison within same generation

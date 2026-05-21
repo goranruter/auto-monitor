@@ -6,381 +6,187 @@
   <title>Auto Monitor</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg: #0e1117;
-      --surface: #161b22;
-      --surface2: #1c2330;
-      --border: #30363d;
-      --accent: #238636;
-      --accent-hover: #2ea043;
-      --danger: #da3633;
-      --text: #e6edf3;
-      --muted: #8b949e;
-      --green: #3fb950;
-      --yellow: #d29922;
-      --red: #f85149;
-      --blue: #58a6ff;
+      --bg: #0e1117; --surface: #161b22; --surface2: #1c2330;
+      --border: #30363d; --accent: #238636; --accent-h: #2ea043;
+      --danger: #da3633; --text: #e6edf3; --muted: #8b949e;
+      --green: #3fb950; --yellow: #d29922; --red: #f85149; --blue: #58a6ff;
     }
+    body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif; font-size:14px; line-height:1.5; }
 
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-      font-size: 14px;
-      line-height: 1.5;
-    }
-
-    /* ── Header ──────────────────────────────────────── */
-    header {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 14px 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-    .logo { font-size: 18px; font-weight: 700; }
-    .logo span { color: var(--blue); }
-    .status-pill {
-      display: flex; align-items: center; gap: 7px;
-      background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 20px; padding: 5px 12px;
-      font-size: 12px; font-weight: 600;
-    }
-    .status-dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: var(--muted);
-    }
-    .status-dot.running {
-      background: var(--green);
-      box-shadow: 0 0 0 3px rgba(63,185,80,.25);
-      animation: blink 1.6s ease-in-out infinite;
-    }
+    /* Header */
+    header { background:var(--surface); border-bottom:1px solid var(--border); padding:13px 22px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
+    .logo { font-size:17px; font-weight:700; } .logo span { color:var(--blue); }
+    .status-pill { display:flex; align-items:center; gap:7px; background:var(--surface2); border:1px solid var(--border); border-radius:20px; padding:5px 12px; font-size:12px; font-weight:600; }
+    .dot { width:8px; height:8px; border-radius:50%; background:var(--muted); }
+    .dot.running { background:var(--green); box-shadow:0 0 0 3px rgba(63,185,80,.25); animation:blink 1.6s ease-in-out infinite; }
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
 
-    /* ── Layout ──────────────────────────────────────── */
-    main { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
+    main { max-width:1200px; margin:0 auto; padding:22px 16px; }
 
-    /* ── Stats ───────────────────────────────────────── */
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
-      gap: 12px; margin-bottom: 22px;
-    }
-    .stat-card {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 10px; padding: 15px 17px;
-    }
-    .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin-bottom: 5px; }
-    .stat-value { font-size: 26px; font-weight: 700; line-height: 1; }
-    .stat-sub   { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    /* Stats */
+    .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:11px; margin-bottom:20px; }
+    .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px 16px; }
+    .stat-label { font-size:10px; text-transform:uppercase; letter-spacing:.8px; color:var(--muted); margin-bottom:5px; }
+    .stat-value { font-size:24px; font-weight:700; line-height:1; }
+    .stat-sub   { font-size:11px; color:var(--muted); margin-top:3px; }
 
-    /* ── Settings panel ──────────────────────────────── */
-    .settings-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      margin-bottom: 20px;
-      overflow: hidden;
-    }
-    .settings-toggle {
-      width: 100%; background: none; border: none;
-      padding: 13px 18px;
-      display: flex; align-items: center; gap: 10px;
-      color: var(--text); cursor: pointer;
-      font-size: 13px; font-weight: 600;
-      text-align: left;
-    }
-    .settings-toggle:hover { background: var(--surface2); }
-    .settings-toggle .arrow { margin-left: auto; transition: transform .2s; font-size: 11px; color: var(--muted); }
-    .settings-toggle.open .arrow { transform: rotate(180deg); }
+    /* Settings card */
+    .settings-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; margin-bottom:18px; overflow:hidden; }
+    .settings-toggle { width:100%; background:none; border:none; padding:13px 18px; display:flex; align-items:center; gap:9px; color:var(--text); cursor:pointer; font-size:13px; font-weight:600; }
+    .settings-toggle:hover { background:var(--surface2); }
+    .s-arrow { margin-left:auto; font-size:10px; color:var(--muted); transition:transform .2s; }
+    .settings-toggle.open .s-arrow { transform:rotate(180deg); }
+    .settings-body { border-top:1px solid var(--border); padding:18px; display:none; }
+    .settings-body.open { display:block; }
 
-    .settings-body {
-      border-top: 1px solid var(--border);
-      padding: 18px;
-      display: none;
-    }
-    .settings-body.open { display: block; }
+    /* Param inputs */
+    .param-row { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:11px; margin-bottom:18px; }
+    .param-group label { display:block; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.7px; color:var(--muted); margin-bottom:5px; }
+    .param-group input { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:7px; padding:7px 10px; color:var(--text); font-size:13px; outline:none; }
+    .param-group input:focus { border-color:var(--blue); }
+    .score-row { display:flex; align-items:center; gap:12px; margin-bottom:20px; }
+    .score-row label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.7px; color:var(--muted); white-space:nowrap; }
+    .score-row input[type=range] { flex:1; accent-color:var(--blue); }
+    .score-val { font-size:14px; font-weight:700; color:var(--blue); min-width:26px; text-align:right; }
 
-    /* Number inputs row */
-    .param-row {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-      gap: 12px;
-      margin-bottom: 20px;
-    }
-    .param-group label {
-      display: block; font-size: 11px; font-weight: 600;
-      text-transform: uppercase; letter-spacing: .7px;
-      color: var(--muted); margin-bottom: 5px;
-    }
-    .param-group input[type=number] {
-      width: 100%;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 7px;
-      padding: 7px 10px;
-      color: var(--text);
-      font-size: 13px;
-      outline: none;
-    }
-    .param-group input[type=number]:focus { border-color: var(--blue); }
+    /* Model browser */
+    .model-browser-header { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+    .model-browser-header span { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.7px; color:var(--muted); }
+    .mb-btn { background:var(--surface2); border:1px solid var(--border); border-radius:5px; padding:3px 9px; font-size:11px; font-weight:600; color:var(--muted); cursor:pointer; }
+    .mb-btn:hover { color:var(--text); }
+    #sel-count { margin-left:auto; font-size:11px; color:var(--muted); }
 
-    /* Score slider */
-    .score-row { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
-    .score-row label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); white-space: nowrap; }
-    .score-row input[type=range] { flex: 1; accent-color: var(--blue); }
-    .score-val { font-size: 14px; font-weight: 700; color: var(--blue); min-width: 28px; text-align: right; }
+    /* Brand list */
+    .brands-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:8px; }
 
-    /* Model groups */
-    .model-section { margin-bottom: 12px; }
-    .model-group-header {
-      display: flex; align-items: center; gap: 10px;
-      margin-bottom: 8px;
+    .brand-block { background:var(--surface2); border:1px solid var(--border); border-radius:9px; overflow:hidden; }
+    .brand-hdr {
+      display:flex; align-items:center; gap:8px;
+      padding:9px 12px; cursor:pointer;
+      user-select:none;
     }
-    .model-group-header span {
-      font-size: 11px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: .8px; color: var(--muted);
-    }
-    .group-btn {
-      background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 5px; padding: 2px 8px;
-      font-size: 10px; font-weight: 600; color: var(--muted);
-      cursor: pointer;
-    }
-    .group-btn:hover { color: var(--text); }
-    .models-grid {
-      display: flex; flex-wrap: wrap; gap: 7px;
-    }
-    .model-chip {
-      cursor: pointer;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 7px;
-      padding: 5px 11px;
-      font-size: 12px;
-      color: var(--muted);
-      user-select: none;
-      transition: background .12s, border-color .12s, color .12s;
-    }
-    .model-chip.selected {
-      background: rgba(88,166,255,.15);
-      border-color: rgba(88,166,255,.5);
-      color: var(--blue);
-      font-weight: 600;
-    }
-    .model-chip:hover:not(.selected) { border-color: #444c56; color: var(--text); }
+    .brand-hdr:hover { background:rgba(255,255,255,.03); }
+    .brand-hdr input[type=checkbox] { accent-color:var(--blue); width:14px; height:14px; flex-shrink:0; cursor:pointer; }
+    .brand-hdr-name { font-size:13px; font-weight:600; flex:1; }
+    .brand-sel-count { font-size:10px; color:var(--blue); font-weight:700; min-width:18px; text-align:right; }
+    .brand-arrow { font-size:9px; color:var(--muted); transition:transform .18s; }
+    .brand-block.open .brand-arrow { transform:rotate(180deg); }
 
-    .select-all-bar {
-      display: flex; align-items: center; gap: 8px;
-      margin-bottom: 14px;
+    .model-list { display:none; border-top:1px solid var(--border); padding:10px 12px 12px; }
+    .brand-block.open .model-list { display:block; }
+    .model-checkboxes { display:flex; flex-wrap:wrap; gap:6px; }
+    .model-check-label {
+      display:flex; align-items:center; gap:5px;
+      background:var(--bg); border:1px solid var(--border);
+      border-radius:6px; padding:4px 9px;
+      font-size:12px; color:var(--muted);
+      cursor:pointer; user-select:none;
+      transition:background .12s, border-color .12s, color .12s;
     }
-    .select-all-bar span { font-size: 12px; color: var(--muted); }
+    .model-check-label:hover { color:var(--text); border-color:#444c56; }
+    .model-check-label input { display:none; }
+    .model-check-label.checked {
+      background:rgba(88,166,255,.13);
+      border-color:rgba(88,166,255,.45);
+      color:var(--blue); font-weight:600;
+    }
 
-    /* ── Controls ────────────────────────────────────── */
-    .controls { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
-    button { cursor: pointer; border: none; border-radius: 7px; padding: 9px 18px; font-size: 13px; font-weight: 600; transition: background .15s, opacity .15s; }
-    #btn-run { background: var(--accent); color: #fff; display: flex; align-items: center; gap: 8px; }
-    #btn-run:hover:not(:disabled) { background: var(--accent-hover); }
-    #btn-run:disabled { opacity: .5; cursor: not-allowed; }
-    #btn-stop { background: var(--danger); color: #fff; display: none; }
-    #btn-stop:hover { filter: brightness(1.1); }
-    #btn-clear-log { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
-    #btn-clear-log:hover { color: var(--text); }
-    .run-summary { font-size: 12px; color: var(--muted); }
+    /* Controls */
+    .controls { display:flex; gap:9px; margin-bottom:18px; flex-wrap:wrap; align-items:center; }
+    button { cursor:pointer; border:none; border-radius:7px; padding:9px 18px; font-size:13px; font-weight:600; transition:background .15s, opacity .15s; }
+    #btn-run { background:var(--accent); color:#fff; }
+    #btn-run:hover:not(:disabled) { background:var(--accent-h); }
+    #btn-run:disabled { opacity:.5; cursor:not-allowed; }
+    #btn-stop { background:var(--danger); color:#fff; display:none; }
+    #btn-stop:hover { filter:brightness(1.1); }
+    #btn-clear { background:var(--surface2); color:var(--muted); border:1px solid var(--border); }
+    #btn-clear:hover { color:var(--text); }
+    #run-summary { font-size:12px; color:var(--muted); }
 
-    /* ── Terminal ────────────────────────────────────── */
-    .terminal-wrap {
-      background: #0d1117; border: 1px solid var(--border);
-      border-radius: 10px; overflow: hidden; margin-bottom: 24px;
-    }
-    .terminal-header {
-      background: var(--surface2); border-bottom: 1px solid var(--border);
-      padding: 8px 14px; font-size: 11px; color: var(--muted);
-      font-weight: 600; letter-spacing: .5px;
-      display: flex; align-items: center; gap: 8px;
-    }
-    .terminal-dots { display: flex; gap: 6px; }
-    .terminal-dots span { width: 10px; height: 10px; border-radius: 50%; }
-    .terminal-dots span:nth-child(1){background:#ff5f57}
-    .terminal-dots span:nth-child(2){background:#febc2e}
-    .terminal-dots span:nth-child(3){background:#28c840}
-    #terminal {
-      font-family: 'Fira Code','Cascadia Code','SF Mono','Consolas',monospace;
-      font-size: 12px; padding: 14px 16px; height: 240px;
-      overflow-y: auto; white-space: pre-wrap; word-break: break-all;
-    }
-    #terminal .t-start { color: var(--blue); font-weight: 700; }
-    #terminal .t-done  { color: var(--green); font-weight: 700; }
-    #terminal .t-error { color: var(--red); }
-    #terminal .t-log   { color: #adbac7; }
-    #terminal .t-time  { color: var(--muted); font-size: 10px; margin-right: 6px; }
+    /* Terminal */
+    .terminal-wrap { background:#0d1117; border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:22px; }
+    .terminal-hdr { background:var(--surface2); border-bottom:1px solid var(--border); padding:7px 13px; font-size:11px; color:var(--muted); font-weight:600; display:flex; align-items:center; gap:8px; }
+    .tdots { display:flex; gap:5px; }
+    .tdots span { width:10px; height:10px; border-radius:50%; }
+    .tdots span:nth-child(1){background:#ff5f57} .tdots span:nth-child(2){background:#febc2e} .tdots span:nth-child(3){background:#28c840}
+    #terminal { font-family:'Fira Code','SF Mono','Consolas',monospace; font-size:12px; padding:12px 15px; height:230px; overflow-y:auto; white-space:pre-wrap; word-break:break-all; }
+    .t-start{color:var(--blue);font-weight:700} .t-done{color:var(--green);font-weight:700} .t-error{color:var(--red)} .t-log{color:#adbac7} .t-time{color:var(--muted);font-size:10px;margin-right:6px}
 
-    /* ── Deal cards ──────────────────────────────────── */
-    .section-heading { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
-    .section-heading h2 { font-size: 16px; font-weight: 700; }
-    .badge { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 2px 9px; font-size: 11px; color: var(--muted); }
-    .refresh-hint { margin-left: auto; font-size: 11px; color: var(--muted); }
+    /* Deal cards */
+    .sec-hdr { display:flex; align-items:baseline; gap:9px; margin-bottom:13px; }
+    .sec-hdr h2 { font-size:15px; font-weight:700; }
+    .badge { background:var(--surface2); border:1px solid var(--border); border-radius:20px; padding:2px 9px; font-size:11px; color:var(--muted); }
+    .upd { margin-left:auto; font-size:11px; color:var(--muted); }
+    #deals-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(310px,1fr)); gap:13px; }
+    .deal-card { background:var(--surface); border:1px solid var(--border); border-radius:11px; overflow:hidden; transition:transform .15s, border-color .15s; }
+    .deal-card:hover { transform:translateY(-2px); border-color:#444c56; }
+    .deal-img { position:relative; height:160px; background:var(--surface2); overflow:hidden; }
+    .deal-img img { width:100%; height:100%; object-fit:cover; }
+    .deal-img .no-img { display:flex; align-items:center; justify-content:center; height:100%; color:var(--muted); font-size:30px; }
+    .rb { position:absolute; top:8px; right:8px; border-radius:7px; padding:3px 9px; font-size:11px; font-weight:700; backdrop-filter:blur(4px); }
+    .rb-ex{background:rgba(35,134,54,.9);color:#aff3be} .rb-go{background:rgba(63,185,80,.85);color:#0d1117}
+    .rb-fa{background:rgba(100,100,110,.8);color:#e6edf3} .rb-hi{background:rgba(210,153,34,.9);color:#0d1117} .rb-vh{background:rgba(218,54,51,.9);color:#ffc8c8}
+    .sb { position:absolute; top:8px; left:8px; background:rgba(13,17,23,.8); border:1px solid var(--border); border-radius:7px; padding:3px 9px; font-size:11px; font-weight:700; backdrop-filter:blur(4px); }
+    .deal-body { padding:12px; }
+    .deal-title { font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:2px; }
+    .deal-sub   { font-size:11px; color:var(--muted); margin-bottom:8px; }
+    .price-row  { display:flex; align-items:baseline; gap:7px; margin-bottom:8px; }
+    .price      { font-size:19px; font-weight:800; color:var(--green); }
+    .median     { font-size:11px; color:var(--muted); }
+    .saving     { margin-left:auto; font-size:12px; font-weight:700; color:var(--green); }
+    .equip-row  { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:10px; }
+    .ec { background:rgba(88,166,255,.12); border:1px solid rgba(88,166,255,.25); border-radius:5px; padding:2px 6px; font-size:10px; font-weight:600; color:var(--blue); }
+    .ec.dmg { background:rgba(218,54,51,.12); border-color:rgba(218,54,51,.3); color:var(--red); }
+    .deal-link { display:block; text-align:center; background:var(--surface2); border:1px solid var(--border); border-radius:7px; padding:6px; font-size:12px; font-weight:600; color:var(--blue); text-decoration:none; }
+    .deal-link:hover { background:rgba(88,166,255,.1); border-color:rgba(88,166,255,.4); }
+    .empty-state { grid-column:1/-1; padding:44px 0; text-align:center; color:var(--muted); }
+    .empty-state .icon { font-size:38px; margin-bottom:10px; }
 
-    #deals-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(320px,1fr)); gap: 14px; }
-
-    .deal-card {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 12px; overflow: hidden;
-      transition: transform .15s, border-color .15s;
-    }
-    .deal-card:hover { transform: translateY(-2px); border-color: #444c56; }
-    .deal-img-wrap { position: relative; height: 165px; background: var(--surface2); overflow: hidden; }
-    .deal-img-wrap img { width: 100%; height: 100%; object-fit: cover; }
-    .deal-img-wrap .no-img { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--muted); font-size: 32px; }
-    .rating-badge {
-      position: absolute; top: 9px; right: 9px;
-      border-radius: 7px; padding: 4px 9px;
-      font-size: 11px; font-weight: 700; backdrop-filter: blur(4px);
-    }
-    .rating-excellent { background: rgba(35,134,54,.9);  color: #aff3be; }
-    .rating-good      { background: rgba(63,185,80,.85); color: #0d1117; }
-    .rating-fair      { background: rgba(100,100,110,.8);color: #e6edf3; }
-    .rating-high      { background: rgba(210,153,34,.9); color: #0d1117; }
-    .rating-veryhigh  { background: rgba(218,54,51,.9);  color: #ffc8c8; }
-    .score-badge {
-      position: absolute; top: 9px; left: 9px;
-      background: rgba(13,17,23,.8); border: 1px solid var(--border);
-      border-radius: 7px; padding: 4px 9px;
-      font-size: 11px; font-weight: 700; backdrop-filter: blur(4px);
-    }
-    .deal-body { padding: 13px; }
-    .deal-title { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
-    .deal-sub   { font-size: 12px; color: var(--muted); margin-bottom: 9px; }
-    .deal-price-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 9px; }
-    .deal-price   { font-size: 20px; font-weight: 800; color: var(--green); }
-    .deal-median  { font-size: 12px; color: var(--muted); }
-    .deal-saving  { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--green); }
-    .deal-specs   { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 9px; }
-    .spec-chip  { background: var(--surface2); border: 1px solid var(--border); border-radius: 5px; padding: 2px 7px; font-size: 11px; color: var(--muted); }
-    .equip-row  { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 11px; }
-    .equip-chip { background: rgba(88,166,255,.12); border: 1px solid rgba(88,166,255,.25); border-radius: 5px; padding: 2px 7px; font-size: 10px; font-weight: 600; color: var(--blue); }
-    .equip-chip.damage { background: rgba(218,54,51,.12); border-color: rgba(218,54,51,.3); color: var(--red); }
-    .deal-link {
-      display: block; text-align: center;
-      background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 7px; padding: 7px;
-      font-size: 12px; font-weight: 600; color: var(--blue);
-      text-decoration: none;
-      transition: background .15s, border-color .15s;
-    }
-    .deal-link:hover { background: rgba(88,166,255,.1); border-color: rgba(88,166,255,.4); }
-    .empty-state { grid-column: 1/-1; padding: 48px 0; text-align: center; color: var(--muted); }
-    .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
-
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
-
-    @media (max-width: 600px) {
-      header { padding: 10px 14px; }
-      main   { padding: 14px 10px; }
-      #deals-grid { grid-template-columns: 1fr; }
-    }
+    ::-webkit-scrollbar{width:6px;height:6px} ::-webkit-scrollbar-track{background:transparent} ::-webkit-scrollbar-thumb{background:#30363d;border-radius:3px}
+    @media(max-width:600px){ header{padding:10px 13px} main{padding:13px 9px} #deals-grid{grid-template-columns:1fr} .brands-list{grid-template-columns:1fr} }
   </style>
 </head>
 <body>
-
 <header>
   <div class="logo">🚗 Auto<span>Monitor</span></div>
-  <div class="status-pill">
-    <div class="status-dot" id="status-dot"></div>
-    <span id="status-text">Idle</span>
-  </div>
+  <div class="status-pill"><div class="dot" id="dot"></div><span id="status-txt">Idle</span></div>
 </header>
 
 <main>
-
   <!-- Stats -->
   <div class="stats">
-    <div class="stat-card">
-      <div class="stat-label">Deals Found</div>
-      <div class="stat-value" id="stat-deals">—</div>
-      <div class="stat-sub">this run</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Models Checked</div>
-      <div class="stat-value" id="stat-models">—</div>
-      <div class="stat-sub">last run</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Best Saving</div>
-      <div class="stat-value" id="stat-best-saving" style="color:var(--green)">—</div>
-      <div class="stat-sub">vs market median</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Last Run</div>
-      <div class="stat-value" id="stat-time" style="font-size:16px;padding-top:4px">—</div>
-      <div class="stat-sub" id="stat-date">no data yet</div>
-    </div>
+    <div class="stat-card"><div class="stat-label">Deals Found</div><div class="stat-value" id="s-deals">—</div><div class="stat-sub">this run</div></div>
+    <div class="stat-card"><div class="stat-label">Models Checked</div><div class="stat-value" id="s-models">—</div><div class="stat-sub">last run</div></div>
+    <div class="stat-card"><div class="stat-label">Best Saving</div><div class="stat-value" id="s-saving" style="color:var(--green)">—</div><div class="stat-sub">vs market median</div></div>
+    <div class="stat-card"><div class="stat-label">Last Run</div><div class="stat-value" id="s-time" style="font-size:15px;padding-top:5px">—</div><div class="stat-sub" id="s-date">no data yet</div></div>
   </div>
 
-  <!-- Settings panel -->
+  <!-- Settings -->
   <div class="settings-card">
-    <button class="settings-toggle" id="settings-toggle">
-      ⚙️ Run Settings
-      <span class="arrow">▼</span>
-    </button>
-    <div class="settings-body" id="settings-body">
+    <button class="settings-toggle" id="stoggle">⚙️ Run Settings <span class="s-arrow">▼</span></button>
+    <div class="settings-body" id="sbody">
 
-      <!-- Numeric params -->
       <div class="param-row">
-        <div class="param-group">
-          <label>Min Price (€)</label>
-          <input type="number" id="inp-min-price" value="3000" min="0" step="500" placeholder="e.g. 3000">
-        </div>
-        <div class="param-group">
-          <label>Max Price (€)</label>
-          <input type="number" id="inp-max-price" value="20000" min="0" step="500" placeholder="e.g. 20000">
-        </div>
-        <div class="param-group">
-          <label>Min Year</label>
-          <input type="number" id="inp-min-year" value="" min="2000" max="2025" placeholder="any">
-        </div>
+        <div class="param-group"><label>Min Price (€)</label><input type="number" id="p-minprice" value="3000" min="0" step="500"></div>
+        <div class="param-group"><label>Max Price (€)</label><input type="number" id="p-maxprice" value="20000" min="0" step="500"></div>
+        <div class="param-group"><label>Min Year <span style="font-weight:400;text-transform:none">(optional)</span></label><input type="number" id="p-year" placeholder="any year" min="2000" max="2025"></div>
       </div>
 
-      <!-- Score slider -->
       <div class="score-row">
         <label>Min Deal Score</label>
-        <input type="range" id="inp-score" min="70" max="100" value="80" step="1">
-        <span class="score-val" id="score-display">80</span>
+        <input type="range" id="p-score" min="70" max="100" value="80">
+        <span class="score-val" id="score-lbl">80</span>
       </div>
 
-      <!-- Model selector -->
-      <div class="select-all-bar">
-        <span>Models to scan:</span>
-        <button type="button" class="group-btn" onclick="selectAllModels()">Select All</button>
-        <button type="button" class="group-btn" onclick="clearAllModels()">Clear All</button>
-        <span id="selected-count" style="margin-left:auto;font-size:11px;color:var(--muted)"></span>
+      <div class="model-browser-header">
+        <span>Select Models</span>
+        <button class="mb-btn" onclick="selectAll()">Select All</button>
+        <button class="mb-btn" onclick="clearAll()">Clear All</button>
+        <span id="sel-count">All models (no filter)</span>
       </div>
 
-      <div class="model-section">
-        <div class="model-group-header">
-          <span>SUVs</span>
-          <button type="button" class="group-btn" onclick="selectGroup('suv')">All SUVs</button>
-          <button type="button" class="group-btn" onclick="clearGroup('suv')">Clear</button>
-        </div>
-        <div class="models-grid" id="group-suv"></div>
-      </div>
-
-      <div class="model-section" style="margin-top:14px">
-        <div class="model-group-header">
-          <span>Cars</span>
-          <button type="button" class="group-btn" onclick="selectGroup('car')">All Cars</button>
-          <button type="button" class="group-btn" onclick="clearGroup('car')">Clear</button>
-        </div>
-        <div class="models-grid" id="group-car"></div>
-      </div>
-
+      <div class="brands-list" id="brands-list"></div>
     </div>
   </div>
 
@@ -388,350 +194,288 @@
   <div class="controls">
     <button id="btn-run">▶ Run Monitor Now</button>
     <button id="btn-stop">⏹ Stop</button>
-    <button id="btn-clear-log">Clear Log</button>
-    <span class="run-summary" id="run-summary"></span>
+    <button id="btn-clear">Clear Log</button>
+    <span id="run-summary"></span>
   </div>
 
   <!-- Terminal -->
   <div class="terminal-wrap">
-    <div class="terminal-header">
-      <div class="terminal-dots"><span></span><span></span><span></span></div>
-      LIVE LOG
-    </div>
+    <div class="terminal-hdr"><div class="tdots"><span></span><span></span><span></span></div>LIVE LOG</div>
     <div id="terminal"><span style="color:var(--muted)">Waiting for run…</span></div>
   </div>
 
-  <!-- Deal cards -->
-  <div class="section-heading">
+  <!-- Deals -->
+  <div class="sec-hdr">
     <h2>Latest Deals</h2>
     <span class="badge" id="deals-badge">0</span>
-    <span class="refresh-hint" id="refresh-hint"></span>
+    <span class="upd" id="upd-hint"></span>
   </div>
   <div id="deals-grid">
-    <div class="empty-state">
-      <div class="icon">🔍</div>
-      <div>No results yet — configure settings and click <strong>Run Monitor Now</strong>.</div>
-    </div>
+    <div class="empty-state"><div class="icon">🔍</div><div>No results yet — configure and click <strong>Run Monitor Now</strong>.</div></div>
   </div>
-
 </main>
 
 <script>
-/* ─────────────────── Model definitions ─────────────────── */
-const MODELS_SUV = [
-  { key: 'nissan-qashqai',       label: 'Nissan Qashqai' },
-  { key: 'volkswagen-tiguan',    label: 'VW Tiguan' },
-  { key: 'skoda-kodiaq',         label: 'Škoda Kodiaq' },
-  { key: 'hyundai-tucson',       label: 'Hyundai Tucson' },
-  { key: 'kia-sportage',         label: 'Kia Sportage' },
-  { key: 'toyota-rav4',          label: 'Toyota RAV4' },
-  { key: 'mazda-cx-5',           label: 'Mazda CX-5' },
-  { key: 'ford-kuga',            label: 'Ford Kuga' },
-  { key: 'peugeot-3008',         label: 'Peugeot 3008' },
-  { key: 'mercedes-benz-glc',    label: 'Mercedes GLC' },
-  { key: 'bmw-x3',               label: 'BMW X3' },
-  { key: 'bmw-x1',               label: 'BMW X1' },
-  { key: 'audi-q5',              label: 'Audi Q5' },
-  { key: 'audi-q3',              label: 'Audi Q3' },
-  { key: 'volkswagen-touareg',   label: 'VW Touareg' },
-  { key: 'hyundai-ix35',         label: 'Hyundai ix35' },
-  { key: 'jeep-compass',         label: 'Jeep Compass' },
-  { key: 'mitsubishi-outlander', label: 'Mitsubishi Outlander' },
-  { key: 'honda-cr-v',           label: 'Honda CR-V' },
-  { key: 'renault-kadjar',       label: 'Renault Kadjar' },
+/* ── Brand / model data ───────────────────────────────── */
+const BRANDS = [
+  { brand:'volkswagen',   label:'Volkswagen',    models:['Golf','Passat','Polo','Tiguan','Touareg','Touran','Sharan','T-Roc','Caddy','Arteon','ID.3','ID.4'] },
+  { brand:'bmw',          label:'BMW',           models:['Serija-1','Serija-2','Serija-3','Serija-4','Serija-5','Serija-7','X1','X2','X3','X4','X5','X6','Z4'] },
+  { brand:'mercedes-benz',label:'Mercedes-Benz', models:['A-Klasa','B-Klasa','C-Klasa','E-Klasa','S-Klasa','GLA','GLB','GLC','GLE','GLK','CLA','CLS'] },
+  { brand:'audi',         label:'Audi',          models:['A1','A3','A4','A5','A6','A7','A8','Q2','Q3','Q5','Q7','Q8','TT','E-Tron'] },
+  { brand:'skoda',        label:'Škoda',         models:['Fabia','Octavia','Superb','Kodiaq','Karoq','Kamiq','Scala','Rapid','Enyaq'] },
+  { brand:'seat',         label:'SEAT',          models:['Ibiza','Leon','Arona','Ateca','Tarraco','Toledo'] },
+  { brand:'opel',         label:'Opel',          models:['Astra','Insignia','Corsa','Meriva','Zafira','Mokka','Crossland','Grandland','Vectra'] },
+  { brand:'ford',         label:'Ford',          models:['Focus','Mondeo','Fiesta','Kuga','Puma','Edge','S-Max','Galaxy','Mustang'] },
+  { brand:'renault',      label:'Renault',       models:['Megane','Clio','Laguna','Kadjar','Captur','Scenic','Talisman','Fluence','Zoe'] },
+  { brand:'peugeot',      label:'Peugeot',       models:['208','308','408','508','2008','3008','5008','4008','Partner'] },
+  { brand:'toyota',       label:'Toyota',        models:['Corolla','Auris','Avensis','RAV4','Yaris','Camry','C-HR','Hilux','Land Cruiser','Prius'] },
+  { brand:'hyundai',      label:'Hyundai',       models:['i20','i30','i40','Tucson','ix35','Santa Fe','Ioniq','Kona','Elantra'] },
+  { brand:'kia',          label:'Kia',           models:['Ceed','Sportage','Sorento','Picanto','Stinger','Optima','Niro','Stonic','ProCeed'] },
+  { brand:'nissan',       label:'Nissan',        models:['Qashqai','Juke','X-Trail','Micra','Leaf','Navara','Murano','350Z','Pathfinder'] },
+  { brand:'honda',        label:'Honda',         models:['Civic','Accord','CR-V','HR-V','Jazz','FR-V','Legend'] },
+  { brand:'mazda',        label:'Mazda',         models:['Mazda2','Mazda3','Mazda6','CX-3','CX-5','CX-7','CX-9','MX-5'] },
+  { brand:'mitsubishi',   label:'Mitsubishi',    models:['Outlander','Eclipse Cross','Pajero','Lancer','Galant','ASX','Colt','Eclipse'] },
+  { brand:'jeep',         label:'Jeep',          models:['Compass','Renegade','Cherokee','Grand Cherokee','Wrangler','Gladiator'] },
+  { brand:'citroen',      label:'Citroën',       models:['C3','C4','C5','C3 Aircross','C5 Aircross','Berlingo','Picasso','C-Elysee'] },
+  { brand:'fiat',         label:'Fiat',          models:['Tipo','Punto','500','Bravo','Doblo','Freemont','Stilo','Linea','Panda'] },
+  { brand:'alfa-romeo',   label:'Alfa Romeo',    models:['Giulia','Stelvio','147','156','159','Giulietta','Spider','Brera'] },
+  { brand:'volvo',        label:'Volvo',         models:['V40','V60','V70','V90','S60','S90','XC40','XC60','XC70','XC90'] },
+  { brand:'land-rover',   label:'Land Rover',    models:['Discovery','Freelander','Range Rover','Defender','Evoque','Discovery Sport'] },
+  { brand:'porsche',      label:'Porsche',       models:['Cayenne','Macan','Panamera','911','Boxster','Cayman'] },
+  { brand:'subaru',       label:'Subaru',        models:['Forester','Outback','Impreza','XV','Legacy','BRZ','WRX'] },
+  { brand:'suzuki',       label:'Suzuki',        models:['Vitara','Swift','SX4','Jimny','Grand Vitara','Baleno'] },
+  { brand:'dacia',        label:'Dacia',         models:['Duster','Sandero','Logan','Spring','Lodgy','Dokker'] },
+  { brand:'chevrolet',    label:'Chevrolet',     models:['Cruze','Aveo','Captiva','Spark','Malibu','Trax','Orlando'] },
+  { brand:'lancia',       label:'Lancia',        models:['Ypsilon','Delta','Lybra','Thesis','Musa'] },
+  { brand:'lexus',        label:'Lexus',         models:['IS','ES','GS','LS','NX','RX','UX','CT'] },
+  { brand:'infiniti',     label:'Infiniti',      models:['Q30','Q50','Q70','QX30','QX50','QX70','FX'] },
+  { brand:'mini',         label:'MINI',          models:['Hatch','Clubman','Countryman','Paceman','Coupe','Roadster'] },
 ];
 
-const MODELS_CAR = [
-  { key: 'volkswagen-golf',      label: 'VW Golf' },
-  { key: 'volkswagen-passat',    label: 'VW Passat' },
-  { key: 'skoda-octavia',        label: 'Škoda Octavia' },
-  { key: 'skoda-superb',         label: 'Škoda Superb' },
-  { key: 'seat-leon',            label: 'Seat Leon' },
-  { key: 'audi-a4',              label: 'Audi A4' },
-  { key: 'audi-a6',              label: 'Audi A6' },
-  { key: 'bmw-serija-3',         label: 'BMW Serija 3' },
-  { key: 'bmw-serija-5',         label: 'BMW Serija 5' },
-  { key: 'mercedes-benz-c-klasa',label: 'Mercedes C' },
-  { key: 'mercedes-benz-e-klasa',label: 'Mercedes E' },
-  { key: 'opel-astra',           label: 'Opel Astra' },
-  { key: 'opel-insignia',        label: 'Opel Insignia' },
-  { key: 'ford-focus',           label: 'Ford Focus' },
-  { key: 'ford-mondeo',          label: 'Ford Mondeo' },
-  { key: 'renault-megane',       label: 'Renault Megane' },
-  { key: 'peugeot-308',          label: 'Peugeot 308' },
-  { key: 'toyota-auris',         label: 'Toyota Auris' },
-  { key: 'hyundai-i30',          label: 'Hyundai i30' },
-  { key: 'kia-ceed',             label: 'Kia Ceed' },
-];
+// Convert label → URL slug: "Grand Cherokee" → "grand-cherokee"
+function toSlug(s) { return s.toLowerCase().replace(/[\s.]+/g,'-').replace(/[^a-z0-9-]/g,''); }
 
-/* ─────────────────── State ──────────────────────────────── */
+// key = "brand-model-slug", e.g. "volkswagen-golf", "mercedes-benz-c-klasa"
+function modelKey(brandSlug, modelLabel) { return brandSlug + '-' + toSlug(modelLabel); }
+
+/* ── Build accordion ──────────────────────────────────── */
 const selected = new Set();
 
-function renderChips(models, groupId, groupName) {
-  const el = document.getElementById(groupId);
-  el.innerHTML = models.map(m => `
-    <div class="model-chip${selected.has(m.key) ? ' selected' : ''}"
-         data-key="${m.key}" data-group="${groupName}"
-         onclick="toggleModel('${m.key}')">
-      ${m.label}
-    </div>
-  `).join('');
+function buildBrands() {
+  const list = document.getElementById('brands-list');
+  list.innerHTML = BRANDS.map(b => {
+    const id = b.brand;
+    const models = b.models.map(m => {
+      const key = modelKey(b.brand, m);
+      return `<label class="model-check-label" id="lbl-${CSS.escape(key)}">
+        <input type="checkbox" value="${key}" onchange="toggleModel('${key}',this)"> ${m}
+      </label>`;
+    }).join('');
+    return `
+<div class="brand-block" id="bb-${id}">
+  <div class="brand-hdr" onclick="toggleBrand('${id}')">
+    <input type="checkbox" id="bc-${id}" onclick="toggleBrandAll(event,'${id}')" title="Select all ${b.label}">
+    <span class="brand-hdr-name">${b.label}</span>
+    <span class="brand-sel-count" id="bsc-${id}"></span>
+    <span class="brand-arrow">▼</span>
+  </div>
+  <div class="model-list"><div class="model-checkboxes">${models}</div></div>
+</div>`;
+  }).join('');
 }
 
-function refreshChips() {
-  document.querySelectorAll('.model-chip').forEach(el => {
-    el.classList.toggle('selected', selected.has(el.dataset.key));
+function toggleBrand(id) {
+  document.getElementById('bb-'+id).classList.toggle('open');
+}
+
+function toggleBrandAll(e, brandSlug) {
+  e.stopPropagation();
+  const cb = e.target;
+  const brand = BRANDS.find(b => b.brand === brandSlug);
+  brand.models.forEach(m => {
+    const key = modelKey(brandSlug, m);
+    cb.checked ? selected.add(key) : selected.delete(key);
   });
-  updateSelectedCount();
+  refreshUI();
 }
 
-function toggleModel(key) {
-  selected.has(key) ? selected.delete(key) : selected.add(key);
-  refreshChips();
+function toggleModel(key, cb) {
+  cb.checked ? selected.add(key) : selected.delete(key);
+  refreshUI();
 }
 
-function selectGroup(group) {
-  const list = group === 'suv' ? MODELS_SUV : MODELS_CAR;
-  list.forEach(m => selected.add(m.key));
-  refreshChips();
-}
-
-function clearGroup(group) {
-  const list = group === 'suv' ? MODELS_SUV : MODELS_CAR;
-  list.forEach(m => selected.delete(m.key));
-  refreshChips();
-}
-
-function selectAllModels() { [...MODELS_SUV, ...MODELS_CAR].forEach(m => selected.add(m.key)); refreshChips(); }
-function clearAllModels()  { selected.clear(); refreshChips(); }
-
-function updateSelectedCount() {
+function refreshUI() {
+  // sync individual checkboxes
+  document.querySelectorAll('.model-check-label input').forEach(inp => {
+    const checked = selected.has(inp.value);
+    inp.checked = checked;
+    inp.closest('.model-check-label').classList.toggle('checked', checked);
+  });
+  // sync brand-level checkboxes + counts
+  BRANDS.forEach(b => {
+    const keys = b.models.map(m => modelKey(b.brand, m));
+    const cnt = keys.filter(k => selected.has(k)).length;
+    const bcc = document.getElementById('bsc-'+b.brand);
+    if (bcc) bcc.textContent = cnt > 0 ? cnt : '';
+    const bc = document.getElementById('bc-'+b.brand);
+    if (bc) { bc.indeterminate = cnt > 0 && cnt < keys.length; bc.checked = cnt === keys.length; }
+  });
+  // global count
   const n = selected.size;
-  const total = MODELS_SUV.length + MODELS_CAR.length;
-  document.getElementById('selected-count').textContent =
-    n === 0 ? 'All 40 models (no filter)' : `${n} / ${total} selected`;
+  document.getElementById('sel-count').textContent = n === 0 ? 'All models (no filter)' : `${n} model${n>1?'a':''} odabrano`;
 }
 
-/* Init chips */
-renderChips(MODELS_SUV, 'group-suv', 'suv');
-renderChips(MODELS_CAR, 'group-car', 'car');
-updateSelectedCount();
+function selectAll() { BRANDS.forEach(b => b.models.forEach(m => selected.add(modelKey(b.brand,m)))); refreshUI(); }
+function clearAll()  { selected.clear(); refreshUI(); }
 
-/* Settings toggle */
-document.getElementById('settings-toggle').addEventListener('click', () => {
-  const toggle = document.getElementById('settings-toggle');
-  const body   = document.getElementById('settings-body');
-  toggle.classList.toggle('open');
-  body.classList.toggle('open');
+buildBrands();
+
+/* ── Settings toggle ──────────────────────────────────── */
+document.getElementById('stoggle').addEventListener('click', () => {
+  document.getElementById('stoggle').classList.toggle('open');
+  document.getElementById('sbody').classList.toggle('open');
 });
 
-/* Score slider live label */
-const scoreSlider = document.getElementById('inp-score');
-const scoreDisplay = document.getElementById('score-display');
-scoreSlider.addEventListener('input', () => { scoreDisplay.textContent = scoreSlider.value; });
+/* ── Score slider ─────────────────────────────────────── */
+const scoreSlider = document.getElementById('p-score');
+scoreSlider.addEventListener('input', () => { document.getElementById('score-lbl').textContent = scoreSlider.value; });
 
-/* ─────────────────── Helpers ────────────────────────────── */
-const $ = id => document.getElementById(id);
-
+/* ── Helpers ──────────────────────────────────────────── */
 function ratingClass(label) {
   if (!label) return '';
   const l = label.toLowerCase();
-  if (l.includes('odlič') || l.includes('excellent')) return 'rating-excellent';
-  if (l.includes('dobra') || l.includes('good'))       return 'rating-good';
-  if (l.includes('fer')  || l.includes('fair'))        return 'rating-fair';
-  if (l.includes('visoka') && !l.includes('pre'))      return 'rating-high';
-  if (l.includes('previsoka'))                         return 'rating-veryhigh';
-  return 'rating-fair';
+  if (l.includes('odlič'))  return 'rb-ex';
+  if (l.includes('dobra'))  return 'rb-go';
+  if (l.includes('fer'))    return 'rb-fa';
+  if (l.includes('previs')) return 'rb-vh';
+  if (l.includes('visoka')) return 'rb-hi';
+  return 'rb-fa';
 }
-
-function fmtPrice(n) {
-  return n == null ? '?' : Math.round(n).toLocaleString('de-DE') + ' €';
-}
-
+function fmtP(n) { return n == null ? '?' : Math.round(n).toLocaleString('de-DE') + ' €'; }
 function equipChips(d) {
-  const chips = [];
-  if (d.has4x4)            chips.push('4x4');
-  if (d.hasPanorama)       chips.push('Panorama');
-  if (d.hasLeather)        chips.push('Koža');
-  if (d.hasNavigation)     chips.push('Navi');
-  if (d.hasHeatedSeats)    chips.push('Grejana sedišta');
-  if (d.isFirstOwner)      chips.push('1. vlasnik');
-  if (d.hasServiceHistory) chips.push('Servisna knjiga');
-  return chips;
+  const c = [];
+  if (d.has4x4)            c.push('4x4');
+  if (d.hasPanorama)       c.push('Panorama');
+  if (d.hasLeather)        c.push('Koža');
+  if (d.hasNavigation)     c.push('Navi');
+  if (d.hasHeatedSeats)    c.push('Grejana sedišta');
+  if (d.isFirstOwner)      c.push('1. vlasnik');
+  if (d.hasServiceHistory) c.push('Servisna knjiga');
+  return c;
 }
 
-/* ─────────────────── Results ────────────────────────────── */
+/* ── Results ──────────────────────────────────────────── */
 async function loadResults() {
-  try {
-    const data = await fetch('/api/results').then(r => r.json());
-    renderResults(data);
-  } catch {}
+  try { renderResults(await fetch('/api/results').then(r=>r.json())); } catch {}
 }
-
 function renderResults(data) {
   const deals = data.deals || [];
-  $('stat-deals').textContent  = deals.length;
-  $('stat-models').textContent = data.modelsChecked || '—';
-  $('deals-badge').textContent = deals.length;
-
+  document.getElementById('s-deals').textContent  = deals.length;
+  document.getElementById('s-models').textContent = data.modelsChecked || '—';
+  document.getElementById('deals-badge').textContent = deals.length;
   if (data.timestamp) {
     const d = new Date(data.timestamp);
-    $('stat-time').textContent = d.toLocaleTimeString('sr-RS', { hour:'2-digit', minute:'2-digit' });
-    $('stat-date').textContent = d.toLocaleDateString('sr-RS', { day:'numeric', month:'short', year:'numeric' });
-    $('refresh-hint').textContent = 'Updated ' + d.toLocaleTimeString('sr-RS', { hour:'2-digit', minute:'2-digit' });
+    document.getElementById('s-time').textContent = d.toLocaleTimeString('sr-RS',{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('s-date').textContent = d.toLocaleDateString('sr-RS',{day:'numeric',month:'short',year:'numeric'});
+    document.getElementById('upd-hint').textContent = 'Updated '+d.toLocaleTimeString('sr-RS',{hour:'2-digit',minute:'2-digit'});
   }
+  const savings = deals.map(d=>(d.marketMedian||d.marketAvg||0)-d.price).filter(s=>s>0);
+  if (savings.length) document.getElementById('s-saving').textContent='−'+Math.round(Math.max(...savings)).toLocaleString('de-DE')+' €';
 
-  const savings = deals.map(d => (d.marketMedian || d.marketAvg || 0) - d.price).filter(s => s > 0);
-  if (savings.length) {
-    $('stat-best-saving').textContent = '−' + Math.round(Math.max(...savings)).toLocaleString('de-DE') + ' €';
-  }
-
-  const grid = $('deals-grid');
-  if (!deals.length) {
-    grid.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><div>No deals found in this run.</div></div>`;
-    return;
-  }
-
-  const sorted = [...deals].sort((a, b) => (b.dealScore || b.score || 0) - (a.dealScore || a.score || 0));
-
+  const grid = document.getElementById('deals-grid');
+  if (!deals.length) { grid.innerHTML='<div class="empty-state"><div class="icon">🔍</div><div>No deals found in this run.</div></div>'; return; }
+  const sorted = [...deals].sort((a,b)=>(b.dealScore||b.score||0)-(a.dealScore||a.score||0));
   grid.innerHTML = sorted.map(d => {
-    const chips   = equipChips(d);
-    const median  = d.marketMedian || d.marketAvg;
-    const saving  = median && d.price < median ? '−' + Math.round(median - d.price).toLocaleString('de-DE') + ' €' : null;
-    const rClass  = ratingClass(d.priceRating || '');
-    const score   = d.dealScore || d.score;
-
+    const chips = equipChips(d);
+    const median = d.marketMedian||d.marketAvg;
+    const saving = median && d.price < median ? '−'+Math.round(median-d.price).toLocaleString('de-DE')+' €' : null;
+    const score  = d.dealScore||d.score;
     return `
 <div class="deal-card">
-  <div class="deal-img-wrap">
-    ${d.image
-      ? `<img src="${d.image}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
-      : ''}
-    <div class="no-img" ${d.image ? 'style="display:none"' : ''}>🚗</div>
-    ${score    ? `<div class="score-badge">⚡ ${score}</div>` : ''}
-    ${d.priceRating ? `<div class="rating-badge ${rClass}">${d.priceRating}</div>` : ''}
+  <div class="deal-img">
+    ${d.image?`<img src="${d.image}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`:''}
+    <div class="no-img" ${d.image?'style="display:none"':''}>🚗</div>
+    ${score?`<div class="sb">⚡ ${score}</div>`:''}
+    ${d.priceRating?`<div class="rb ${ratingClass(d.priceRating)}">${d.priceRating}</div>`:''}
   </div>
   <div class="deal-body">
-    <div class="deal-title" title="${d.title || ''}">${d.title || d.searchLabel || '—'}</div>
-    <div class="deal-sub">${[d.year, d.km ? d.km.toLocaleString('de-DE')+' km' : null, d.fuel, d.transmission].filter(Boolean).join(' · ')}</div>
-    <div class="deal-price-row">
-      <div class="deal-price">${fmtPrice(d.price)}</div>
-      ${median ? `<div class="deal-median">med. ${fmtPrice(median)}</div>` : ''}
-      ${saving ? `<div class="deal-saving">${saving}</div>` : ''}
+    <div class="deal-title" title="${d.title||''}">${d.title||d.searchLabel||'—'}</div>
+    <div class="deal-sub">${[d.year,d.km?d.km.toLocaleString('de-DE')+' km':null,d.fuel,d.transmission].filter(Boolean).join(' · ')}</div>
+    <div class="price-row">
+      <div class="price">${fmtP(d.price)}</div>
+      ${median?`<div class="median">med. ${fmtP(median)}</div>`:''}
+      ${saving?`<div class="saving">${saving}</div>`:''}
     </div>
-    ${chips.length || d.hasAccident ? `
-    <div class="equip-row">
-      ${chips.map(c => `<span class="equip-chip">${c}</span>`).join('')}
-      ${d.hasAccident ? `<span class="equip-chip damage">⚠ Havarisano</span>` : ''}
-    </div>` : ''}
+    ${chips.length||d.hasAccident?`<div class="equip-row">${chips.map(c=>`<span class="ec">${c}</span>`).join('')}${d.hasAccident?'<span class="ec dmg">⚠ Havarisano</span>':''}</div>`:''}
     <a class="deal-link" href="${d.url}" target="_blank" rel="noopener">Pogledaj oglas →</a>
   </div>
 </div>`;
   }).join('');
 }
 
-/* ─────────────────── Terminal ───────────────────────────── */
-const terminal = $('terminal');
+/* ── Terminal ─────────────────────────────────────────── */
+const term = document.getElementById('terminal');
 let autoScroll = true;
-terminal.addEventListener('scroll', () => {
-  autoScroll = terminal.scrollTop + terminal.clientHeight >= terminal.scrollHeight - 20;
-});
-
+term.addEventListener('scroll', ()=>{ autoScroll = term.scrollTop+term.clientHeight >= term.scrollHeight-20; });
 function termLine(type, text, time) {
-  const line = document.createElement('div');
-  if (time) {
-    const ts = document.createElement('span');
-    ts.className = 't-time';
-    ts.textContent = time;
-    line.appendChild(ts);
-  }
-  const c = document.createElement('span');
-  c.className = `t-${type}`;
-  c.textContent = text;
-  line.appendChild(c);
-  terminal.appendChild(line);
-  if (autoScroll) terminal.scrollTop = terminal.scrollHeight;
+  const row = document.createElement('div');
+  if (time) { const ts=document.createElement('span'); ts.className='t-time'; ts.textContent=time; row.appendChild(ts); }
+  const c=document.createElement('span'); c.className='t-'+type; c.textContent=text; row.appendChild(c);
+  term.appendChild(row);
+  if (autoScroll) term.scrollTop=term.scrollHeight;
 }
 
-/* ─────────────────── Run / Stop ─────────────────────────── */
-let evtSource = null;
-let isRunning = false;
-
-function setRunning(val) {
-  isRunning = val;
-  $('status-dot').className    = 'status-dot' + (val ? ' running' : '');
-  $('status-text').textContent = val ? 'Running…' : 'Idle';
-  $('btn-run').disabled        = val;
-  $('btn-stop').style.display  = val ? 'inline-block' : 'none';
+/* ── Run / Stop ───────────────────────────────────────── */
+let evt=null, running=false;
+function setRunning(v) {
+  running=v;
+  document.getElementById('dot').className='dot'+(v?' running':'');
+  document.getElementById('status-txt').textContent=v?'Running…':'Idle';
+  document.getElementById('btn-run').disabled=v;
+  document.getElementById('btn-stop').style.display=v?'inline-block':'none';
 }
 
-$('btn-run').addEventListener('click', () => {
-  if (isRunning) return;
+document.getElementById('btn-run').addEventListener('click', ()=>{
+  if (running) return;
+  const p = new URLSearchParams();
+  const minP=document.getElementById('p-minprice').value.trim();
+  const maxP=document.getElementById('p-maxprice').value.trim();
+  const yr  =document.getElementById('p-year').value.trim();
+  const sc  =scoreSlider.value;
+  if (minP) p.set('minPrice',minP);
+  if (maxP) p.set('maxPrice',maxP);
+  if (yr)   p.set('minYear',yr);
+  p.set('minScore',sc);
+  if (selected.size>0) p.set('models',[...selected].join(','));
 
-  // Build query params from settings
-  const params = new URLSearchParams();
-  const minPrice = $('inp-min-price').value.trim();
-  const maxPrice = $('inp-max-price').value.trim();
-  const minYear  = $('inp-min-year').value.trim();
-  const score    = scoreSlider.value;
-  if (minPrice) params.set('minPrice', minPrice);
-  if (maxPrice) params.set('maxPrice', maxPrice);
-  if (minYear)  params.set('minYear',  minYear);
-  params.set('minScore', score);
-  if (selected.size > 0) params.set('models', [...selected].join(','));
+  const modelCount = selected.size>0 ? `${selected.size} model(a)` : 'svi modeli';
+  const yearStr    = yr ? `od ${yr}` : 'bilo koje god.';
+  document.getElementById('run-summary').textContent=`${modelCount} · ${minP||'0'}–${maxP||'∞'} € · ${yearStr} · skor ≥ ${sc}`;
 
-  // Show run summary
-  const modelCount = selected.size > 0 ? `${selected.size} model(a)` : 'svi modeli (40)';
-  const yearStr    = minYear ? `od ${minYear}` : 'bilo koje god.';
-  $('run-summary').textContent = `${modelCount} · ${minPrice||'0'}–${maxPrice||'∞'} € · ${yearStr} · skor ≥ ${score}`;
+  term.innerHTML=''; autoScroll=true; setRunning(true);
 
-  terminal.innerHTML = '';
-  autoScroll = true;
-  setRunning(true);
-
-  evtSource = new EventSource('/api/run?' + params.toString());
-
-  evtSource.onmessage = e => {
-    const { type, text, time } = JSON.parse(e.data);
-    termLine(type, text, time);
-    if (type === 'done') {
-      evtSource.close(); evtSource = null;
-      setRunning(false);
-      setTimeout(loadResults, 1200);
-    }
+  evt = new EventSource('/api/run?'+p.toString());
+  evt.onmessage = e => {
+    const {type,text,time}=JSON.parse(e.data);
+    termLine(type,text,time);
+    if (type==='done') { evt.close(); evt=null; setRunning(false); setTimeout(loadResults,1200); }
   };
-
-  evtSource.onerror = () => {
-    termLine('error', 'Connection lost.', null);
-    evtSource.close(); evtSource = null;
-    setRunning(false);
-    setTimeout(loadResults, 1200);
-  };
+  evt.onerror = ()=>{ termLine('error','Connection lost.',null); evt.close(); evt=null; setRunning(false); setTimeout(loadResults,1200); };
 });
 
-$('btn-stop').addEventListener('click', async () => {
-  await fetch('/api/stop', { method: 'POST' });
-  if (evtSource) { evtSource.close(); evtSource = null; }
-  setRunning(false);
-  termLine('error', '=== Stopped by user ===', null);
+document.getElementById('btn-stop').addEventListener('click', async ()=>{
+  await fetch('/api/stop',{method:'POST'});
+  if(evt){evt.close();evt=null;} setRunning(false); termLine('error','=== Stopped by user ===',null);
 });
 
-$('btn-clear-log').addEventListener('click', () => {
-  terminal.innerHTML = '<span style="color:var(--muted)">Log cleared.</span>';
-});
+document.getElementById('btn-clear').addEventListener('click', ()=>{ term.innerHTML='<span style="color:var(--muted)">Log cleared.</span>'; });
 
-/* ─────────────────── Status poll + auto refresh ─────────── */
+/* ── Poll ─────────────────────────────────────────────── */
 async function checkStatus() {
-  try {
-    const { isRunning: r } = await fetch('/api/status').then(x => x.json());
-    if (r !== isRunning) setRunning(r);
-  } catch {}
+  try { const {isRunning:r}=await fetch('/api/status').then(x=>x.json()); if(r!==running) setRunning(r); } catch {}
 }
-
-loadResults();
-checkStatus();
-setInterval(checkStatus,  5000);
-setInterval(loadResults, 30000);
+loadResults(); checkStatus();
+setInterval(checkStatus,5000); setInterval(loadResults,30000);
 </script>
 </body>
 </html>

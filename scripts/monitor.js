@@ -377,9 +377,26 @@ async function fetchListingsFromPage(url, search) {
         const price = priceMatch ? parseInt(priceMatch[1].replace(/[^\d]/g, '')) : null;
         if (!price || price < MIN_PRICE || price > MAX_PRICE) continue;
 
-        // Year
-        const yearMatch = text.match(/\b(201[5-9]|202[0-9])\b/);
-        const year = yearMatch ? parseInt(yearMatch[0]) : null;
+        // Year — try dedicated element first, then regex on full text
+        let year = null;
+        const yearEl = el.querySelector(
+          '[class*="year"], [class*="godina"], [class*="godiste"], [class*="Godište"], ' +
+          '[class*="Godiste"], [data-field="year"], [data-field="godina"]'
+        );
+        if (yearEl) {
+          const yNum = parseInt(yearEl.innerText.replace(/[^\d]/g, ''));
+          if (yNum >= 1990 && yNum <= 2030) year = yNum;
+        }
+        if (!year) {
+          // Scan all inline text nodes for a 4-digit year (1990–2030)
+          // Look in structured sub-elements first to avoid matching phone numbers etc.
+          const structuredText = Array.from(
+            el.querySelectorAll('span, td, li, [class*="detail"], [class*="info"], [class*="param"]')
+          ).map(e => e.innerText).join(' ');
+          const searchText = structuredText || text;
+          const yMatch = searchText.match(/\b(199[0-9]|200[0-9]|201[0-9]|202[0-9])\b/);
+          if (yMatch) year = parseInt(yMatch[0]);
+        }
         if (year && year < MIN_YEAR) continue;
         if (year && MAX_YEAR && year > MAX_YEAR) continue;
 

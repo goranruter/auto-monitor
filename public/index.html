@@ -401,7 +401,9 @@ function renderResults(data) {
   </div>
   <div class="deal-body">
     <div class="deal-title" title="${d.title||''}">${d.title||d.searchLabel||'—'}</div>
-    <div class="deal-sub">${[d.year,d.km?d.km.toLocaleString('de-DE')+' km':null,d.fuel,d.transmission].filter(Boolean).join(' · ')}</div>
+    <div class="deal-sub">
+      ${d.year ? `<span style="background:rgba(88,166,255,.15);border:1px solid rgba(88,166,255,.3);border-radius:5px;padding:1px 7px;font-size:11px;font-weight:700;color:var(--blue);margin-right:4px;">${d.year}</span>` : '<span style="background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.25);border-radius:5px;padding:1px 7px;font-size:11px;font-weight:600;color:var(--red);margin-right:4px;">god?</span>'}${[d.km?d.km.toLocaleString('de-DE')+' km':null,d.fuel,d.transmission].filter(Boolean).join(' · ')}
+    </div>
     <div class="price-row">
       <div class="price">${fmtP(d.price)}</div>
       ${median?`<div class="median">med. ${fmtP(median)}</div>`:''}

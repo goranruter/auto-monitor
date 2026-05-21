@@ -170,7 +170,8 @@
       <div class="param-row">
         <div class="param-group"><label>Min Price (€)</label><input type="number" id="p-minprice" value="3000" min="0" step="500"></div>
         <div class="param-group"><label>Max Price (€)</label><input type="number" id="p-maxprice" value="20000" min="0" step="500"></div>
-        <div class="param-group"><label>Min Year <span style="font-weight:400;text-transform:none">(optional)</span></label><input type="number" id="p-year" placeholder="any year" min="2000" max="2025"></div>
+        <div class="param-group"><label>Min Year <span style="font-weight:400;text-transform:none">(optional)</span></label><input type="number" id="p-minyear" placeholder="e.g. 2015" min="2000" max="2030"></div>
+        <div class="param-group"><label>Max Year <span style="font-weight:400;text-transform:none">(optional)</span></label><input type="number" id="p-maxyear" placeholder="e.g. 2022" min="2000" max="2030"></div>
       </div>
 
       <div class="score-row">
@@ -438,19 +439,23 @@ function setRunning(v) {
 document.getElementById('btn-run').addEventListener('click', ()=>{
   if (running) return;
   const p = new URLSearchParams();
-  const minP=document.getElementById('p-minprice').value.trim();
-  const maxP=document.getElementById('p-maxprice').value.trim();
-  const yr  =document.getElementById('p-year').value.trim();
-  const sc  =scoreSlider.value;
-  if (minP) p.set('minPrice',minP);
-  if (maxP) p.set('maxPrice',maxP);
-  if (yr)   p.set('minYear',yr);
-  p.set('minScore',sc);
-  if (selected.size>0) p.set('models',[...selected].join(','));
+  const minP   = document.getElementById('p-minprice').value.trim();
+  const maxP   = document.getElementById('p-maxprice').value.trim();
+  const minYr  = document.getElementById('p-minyear').value.trim();
+  const maxYr  = document.getElementById('p-maxyear').value.trim();
+  const sc     = scoreSlider.value;
+  if (minP)  p.set('minPrice', minP);
+  if (maxP)  p.set('maxPrice', maxP);
+  if (minYr) p.set('minYear',  minYr);
+  if (maxYr) p.set('maxYear',  maxYr);
+  p.set('minScore', sc);
+  if (selected.size > 0) p.set('models', [...selected].join(','));
 
-  const modelCount = selected.size>0 ? `${selected.size} model(a)` : 'svi modeli';
-  const yearStr    = yr ? `od ${yr}` : 'bilo koje god.';
-  document.getElementById('run-summary').textContent=`${modelCount} · ${minP||'0'}–${maxP||'∞'} € · ${yearStr} · skor ≥ ${sc}`;
+  const modelCount = selected.size > 0 ? `${selected.size} model(a)` : 'svi modeli';
+  const yearStr = minYr || maxYr
+    ? `${minYr || '?'}–${maxYr || 'danas'}`
+    : 'bilo koje god.';
+  document.getElementById('run-summary').textContent = `${modelCount} · ${minP||'0'}–${maxP||'∞'} € · ${yearStr} · skor ≥ ${sc}`;
 
   term.innerHTML=''; autoScroll=true; setRunning(true);
 

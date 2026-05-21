@@ -84,6 +84,7 @@ app.get('/api/run', (req, res) => {
   if (req.query.minPrice)  env.MIN_PRICE      = req.query.minPrice;
   if (req.query.maxPrice)  env.MAX_PRICE      = req.query.maxPrice;
   if (req.query.minYear)   env.MIN_YEAR       = req.query.minYear;
+  if (req.query.maxYear)   env.MAX_YEAR       = req.query.maxYear;
   if (req.query.minScore)  env.MIN_DEAL_SCORE = req.query.minScore;
   if (req.query.models)    env.MONITOR_MODELS = req.query.models;
 

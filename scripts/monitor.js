@@ -9,7 +9,8 @@ const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 const MIN_DEAL_SCORE = parseInt(process.env.MIN_DEAL_SCORE || '80');
 const MIN_PRICE = parseInt(process.env.MIN_PRICE || '3000');
 const MAX_PRICE = parseInt(process.env.MAX_PRICE || '20000');
-const MIN_YEAR = parseInt(process.env.MIN_YEAR || '2014');
+const MIN_YEAR = parseInt(process.env.MIN_YEAR || '2000');
+const MAX_YEAR = process.env.MAX_YEAR ? parseInt(process.env.MAX_YEAR) : null;
 
 // MONITOR_TYPE: 'suv' (default) or 'cars'
 const MONITOR_TYPE = (process.env.MONITOR_TYPE || 'suv').toLowerCase();
@@ -291,7 +292,7 @@ async function fetchListingsFromPage(url, search) {
     }
 
     const results = await page.evaluate((params) => {
-      const { brand, model, label, keywords, MIN_PRICE, MAX_PRICE, MIN_YEAR } = params;
+      const { brand, model, label, keywords, MIN_PRICE, MAX_PRICE, MIN_YEAR, MAX_YEAR } = params;
       const listings = [];
 
       // Find all links pointing to individual ad pages
@@ -348,6 +349,7 @@ async function fetchListingsFromPage(url, search) {
         const yearMatch = text.match(/\b(201[5-9]|202[0-9])\b/);
         const year = yearMatch ? parseInt(yearMatch[0]) : null;
         if (year && year < MIN_YEAR) continue;
+        if (year && MAX_YEAR && year > MAX_YEAR) continue;
 
         // KM — match 3-6 digit number before "km", avoid millions
         const kmMatch = text.match(/\b(\d{2,3}(?:[.\s]\d{3})?)\s*km\b/i);
@@ -430,7 +432,7 @@ async function fetchListingsFromPage(url, search) {
       }
 
       return listings;
-    }, { brand: search.brand, model: search.model, label: search.label, keywords: search.keywords || [], MIN_PRICE, MAX_PRICE, MIN_YEAR });
+    }, { brand: search.brand, model: search.model, label: search.label, keywords: search.keywords || [], MIN_PRICE, MAX_PRICE, MIN_YEAR, MAX_YEAR });
 
     console.log(`  [${url.includes('poslednja24h') ? '24h' : 'baseline'}] Found ${results.length} listings`);
     return results;
@@ -534,6 +536,7 @@ function parseListings(html, search) {
 
     if (!price || price < MIN_PRICE || price > MAX_PRICE) return;
     if (year && year < MIN_YEAR) return;
+    if (year && MAX_YEAR && year > MAX_YEAR) return;
 
     const image = $el.find('img').first().attr('src') || $el.find('img').first().attr('data-src') || null;
     const fullText = `${title} ${engine} ${detailText} ${allText}`;
@@ -551,9 +554,10 @@ function parseListings(html, search) {
 }
 
 async function fetchListings(search, last24h = false) {
+  const yearTo = MAX_YEAR || '';
   const url = last24h
-    ? `https://www.polovniautomobili.com/auto-oglasi/poslednja24h?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&price_to=${MAX_PRICE}&year_from=${MIN_YEAR}&year_to=&modeltxt=&showOldNew=all&country=&city=&submit_1=&page=&sort=`
-    : `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&price_to=${MAX_PRICE}&year_from=${MIN_YEAR}&sort=date_desc&showOldNew=all&page=1`;
+    ? `https://www.polovniautomobili.com/auto-oglasi/poslednja24h?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&price_to=${MAX_PRICE}&year_from=${MIN_YEAR}&year_to=${yearTo}&modeltxt=&showOldNew=all&country=&city=&submit_1=&page=&sort=`
+    : `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&price_to=${MAX_PRICE}&year_from=${MIN_YEAR}&year_to=${yearTo}&sort=date_desc&showOldNew=all&page=1`;
   return fetchListingsFromPage(url, search);
 }
 
@@ -562,7 +566,8 @@ async function fetchBaseline(search) {
   let page = 1;
   let thinStreak = 0; // consecutive pages with ≤2 listings
   while (true) {
-    const url = `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&price_to=${MAX_PRICE}&year_from=${MIN_YEAR}&sort=date_desc&showOldNew=all&page=${page}`;
+    const yearTo = MAX_YEAR || '';
+    const url = `https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=${search.brand}&model=${search.model}&price_from=${MIN_PRICE}&price_to=${MAX_PRICE}&year_from=${MIN_YEAR}&year_to=${yearTo}&sort=date_desc&showOldNew=all&page=${page}`;
     const listings = await fetchListingsFromPage(url, search);
     if (listings.length === 0) break;
     results.push(...listings);
@@ -799,7 +804,7 @@ async function pMap(items, fn, concurrency = 5) {
 
 async function main() {
   console.log(`\n=== Auto Monitor Start: ${new Date().toISOString()} ===`);
-  console.log(`Min price: ${MIN_PRICE}€ | Max price: ${MAX_PRICE}€ | Min year: ${MIN_YEAR} | Min deal score: ${MIN_DEAL_SCORE} | Searches: ${ACTIVE_SEARCHES.length}`);
+  console.log(`Price: ${MIN_PRICE}–${MAX_PRICE}€ | Year: ${MIN_YEAR}–${MAX_YEAR||'any'} | Min score: ${MIN_DEAL_SCORE} | Models: ${ACTIVE_SEARCHES.length}`);
 
   await initBrowser();
 

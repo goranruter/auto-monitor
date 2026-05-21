@@ -994,7 +994,11 @@ async function main() {
   });
 
   if (newDeals.length > 0) {
-    await sendEmail(newDeals);
+    if (GMAIL_USER && GMAIL_APP_PASSWORD) {
+      await sendEmail(newDeals);
+    } else {
+      console.log(`Pronađeno ${newDeals.length} deal(a) — email preskočen (GMAIL_USER/GMAIL_APP_PASSWORD nisu postavljeni).`);
+    }
   } else {
     console.log('Nema novih top ponuda, email se ne šalje.');
   }
